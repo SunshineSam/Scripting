@@ -69,3 +69,4 @@ This operates under the same logic as the WYSIWYG script.
 The difference being, it stores each state in its own custom field.
 Less complexity, much easier to adapt for your own use.
 
+<img src="https://raw.githubusercontent.com/SunshineSam/Scripting/main/NinjaRMM/Bitlocker/images/CardIconEnabled.png" alt="BitLocker Enabled Icon" width="360px" />
