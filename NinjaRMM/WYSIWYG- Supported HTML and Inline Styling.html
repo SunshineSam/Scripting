@@ -1,0 +1,356 @@
+<div class="article-body article-container" itemprop="articleBody">
+          <p><img src="/hc/article_attachments/29496616547341" alt="NinjaDojo-logo-darkblue.png"></p>
+<p>&nbsp;</p>
+<p data-renderer-start-pos="1">The NinjaOne WYSIWYG custom fields operate an allowlist of elements and supported inline styles that can be used for the elements. NinjaOne also provides CSS classes that technicians can utilize for NinjaOne styling.</p>
+<p>&nbsp;</p>
+<h2 id="h_01HDRTN3NPJFR3HDTPVFSTZK09" data-renderer-start-pos="1"><strong>Table of Contents:</strong></h2>
+<ul>
+<li><a href="#h_01HZSQ0QQ2M69C0BAPFJR7370Q">Using the WYSIWYG Editor in NinjaOne&nbsp;</a></li>
+<li><a href="#h_01HH2AHX4PNYNJ0MWCG1FP6AD0">Using HTML and Inline Styling through API and CLI&nbsp;</a></li>
+<li><a href="#h_01HDRTN3NP24MRGCM309VA27RN">HTML Elements</a></li>
+<li><a href="#h_01HDRTN3NP9NRQTJEJKMF91AZ3">Inline Styling Options</a></li>
+<li><a href="#h_01J2KQD42TBMCRCY5CV1Z80TR4">Charts</a></li>
+<li><a href="#h_01HDRZAQQ2NFT266GR78NSJKRQ">NinjaOne CSS Classes</a></li>
+</ul>
+<p>&nbsp;</p>
+<h2 id="h_01HZSQ0QQ2M69C0BAPFJR7370Q" data-renderer-start-pos="1"><strong>Using the WYSIWYG Editor in NinjaOne:&nbsp;</strong></h2>
+<p>The NinjaOne Documentation application offers WYSIWYG (What You See is What You Get) fields in both the <a href="/hc/en-us/articles/6921324974861" target="_blank" rel="noopener noreferrer">Knowledge Base</a> and as a custom field for <a href="/hc/en-us/articles/18030982761357-NinjaOne-Documentation-Tool-Configuration#01H4E5JF6W3FMGEVWX0ADT2Q79:~:text=copy%20copy%22%20template.-,Create%20a%20Document%20Template,-To%20create%20a" target="_blank" rel="noopener noreferrer">document templates</a>.&nbsp;</p>
+<p class="guide-markup" style="box-sizing: inherit; font-weight: 400; margin: 0.5em 0px; padding: 0px; color: #2f3941; font-family: -apple-system, BlinkMacSystemFont, ' Segoe UI' , Helvetica, Arial, sans-serif; font-size: 15px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: normal; background-color: #ffffff; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial;"><strong class="guide-markup" style="box-sizing: inherit; font-weight: bolder;">WYSIWYG Functionality:&nbsp;</strong></p>
+<ul class="guide-markup" style="box-sizing: inherit; font-weight: 400; margin: 1.3em 0px 1.3em 1.3em; padding: 0px 0px 0px 1.3em; list-style: outside disc; color: #2f3941; font-family: -apple-system, BlinkMacSystemFont, ' Segoe UI' , Helvetica, Arial, sans-serif; font-size: 15px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: normal; background-color: #ffffff; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial;">
+<li class="guide-markup" style="box-sizing: inherit; font-weight: inherit;">By default, when an HTML field has more than 10,000 characters, it will collapse and user must click the expand button to see the full content.</li>
+<li class="guide-markup" style="box-sizing: inherit; font-weight: inherit;">The max character limit for WYSIWYGs is 200 thousand characters.</li>
+<li class="guide-markup" style="box-sizing: inherit; font-weight: inherit;">There can be no more than 20 WYSIWYG custom fields per form or document template. Once the limit is reached, the WYSIWYG selection for the Field type will be locked.</li>
+</ul>
+<p>&nbsp;</p>
+<h2 id="h_01HH2AHX4PNYNJ0MWCG1FP6AD0" data-renderer-start-pos="1"><strong>Using HTML and Inline Styling through API and CLI:&nbsp;</strong></h2>
+<p>NinjaOne system administrators and technicians can use HTML and inline styling when creating <strong>Role/Global Custom Fields</strong> and <strong>Apps &amp; Services</strong> documentation that use the "WYSIWYG" field type.&nbsp;</p>
+<p>These styling options allow for greater flexibility and customization when displaying data in NinjaOne. For example, the screenshot below shows what it would look like if a custom field contained widgets with hyperlinks:&nbsp;</p>
+<p><img src="/hc/article_attachments/29496648043789" alt="example_widgets with links.png"></p>
+<div class="callout">
+<strong>Important Note:</strong> These styling options must be applied from the API or CLI and cannot be done from within the NinjaOne console at this time.&nbsp;</div>
+<p>See below for a complete list of elements and CSS classes that can be used to build your content:</p>
+<p>&nbsp;</p>
+<h2 id="h_01HDRTN3NP24MRGCM309VA27RN" data-renderer-start-pos="1"><strong>HTML Elements:</strong></h2>
+<table style="width: 100%;" border="1">
+<tbody>
+<tr>
+<th class="wysiwyg-text-align-center" style="width: 50%; background-color: gray;"><span class="wysiwyg-color-black10">Element</span></th>
+<th class="wysiwyg-text-align-center" style="width: 50%; background-color: gray;"><span class="wysiwyg-color-black10">Supports NinjaOne classes?</span></th>
+</tr>
+<tr>
+<td style="width: 50%; padding: 8px;">a</td>
+<td style="width: 50%; padding: 8px;">Yes</td>
+</tr>
+<tr>
+<td style="width: 50%; padding: 8px;">blockquote</td>
+<td style="width: 50%; padding: 8px;">Yes</td>
+</tr>
+<tr>
+<td style="width: 50%; padding: 8px;">caption</td>
+<td style="width: 50%; padding: 8px;">Yes</td>
+</tr>
+<tr>
+<td style="width: 50%; padding: 8px;">code</td>
+<td style="width: 50%; padding: 8px;">&nbsp;</td>
+</tr>
+<tr>
+<td style="width: 50%; padding: 8px;">col</td>
+<td style="width: 50%; padding: 8px;">Yes</td>
+</tr>
+<tr>
+<td style="width: 50%; padding: 8px;">div</td>
+<td style="width: 50%; padding: 8px;">Yes</td>
+</tr>
+<tr>
+<td style="width: 50%; padding: 8px;">h1</td>
+<td style="width: 50%; padding: 8px;">Yes</td>
+</tr>
+<tr>
+<td style="width: 50%; padding: 8px;">h2</td>
+<td style="width: 50%; padding: 8px;">Yes</td>
+</tr>
+<tr>
+<td style="width: 50%; padding: 8px;">h3</td>
+<td style="width: 50%; padding: 8px;">Yes</td>
+</tr>
+<tr>
+<td style="width: 50%; padding: 8px;">h4</td>
+<td style="width: 50%; padding: 8px;">Yes</td>
+</tr>
+<tr>
+<td style="width: 50%; padding: 8px;">h5</td>
+<td style="width: 50%; padding: 8px;">Yes</td>
+</tr>
+<tr>
+<td style="width: 50%; padding: 8px;">h6</td>
+<td style="width: 50%; padding: 8px;">Yes</td>
+</tr>
+<tr>
+<td style="width: 50%; padding: 8px;">i</td>
+<td style="width: 50%; padding: 8px;">Yes</td>
+</tr>
+<tr>
+<td style="width: 50%; padding: 8px;">li</td>
+<td style="width: 50%; padding: 8px;">Yes</td>
+</tr>
+<tr>
+<td style="width: 50%; padding: 8px;">ol</td>
+<td style="width: 50%; padding: 8px;">Yes</td>
+</tr>
+<tr>
+<td style="width: 50%; padding: 8px;">p</td>
+<td style="width: 50%; padding: 8px;">Yes</td>
+</tr>
+<tr>
+<td style="width: 50%; padding: 8px;">pre</td>
+<td style="width: 50%; padding: 8px;">&nbsp;</td>
+</tr>
+<tr>
+<td style="width: 50%; padding: 8px;">span</td>
+<td style="width: 50%; padding: 8px;">Yes</td>
+</tr>
+<tr>
+<td style="width: 50%; padding: 8px;">table</td>
+<td style="width: 50%; padding: 8px;">Yes</td>
+</tr>
+<tr>
+<td style="width: 50%; padding: 8px;">tbody</td>
+<td style="width: 50%; padding: 8px;">Yes</td>
+</tr>
+<tr>
+<td style="width: 50%; padding: 8px;">td</td>
+<td style="width: 50%; padding: 8px;">Yes</td>
+</tr>
+<tr>
+<td style="width: 50%; padding: 8px;">tfoot</td>
+<td style="width: 50%; padding: 8px;">Yes</td>
+</tr>
+<tr>
+<td style="width: 50%; padding: 8px;">th</td>
+<td style="width: 50%; padding: 8px;">Yes</td>
+</tr>
+<tr>
+<td style="width: 50%; padding: 8px;">thead</td>
+<td style="width: 50%; padding: 8px;">Yes</td>
+</tr>
+<tr>
+<td style="width: 50%; padding: 8px;">tr</td>
+<td style="width: 50%; padding: 8px;">Yes</td>
+</tr>
+<tr>
+<td style="width: 50%; padding: 8px;">ul</td>
+<td style="width: 50%; padding: 8px;">Yes</td>
+</tr>
+</tbody>
+</table>
+<p>&nbsp;</p>
+<h2 id="h_01HDRTN3NP9NRQTJEJKMF91AZ3" data-renderer-start-pos="1"><strong>Inline Styling Options:</strong></h2>
+<table style="width: 100%;" border="1">
+<tbody>
+<tr>
+<th class="wysiwyg-text-align-center" style="width: 28.4286%; background-color: gray;"><span class="wysiwyg-color-black10">Style</span></th>
+<th class="wysiwyg-text-align-center" style="width: 71.5714%; background-color: gray;"><span class="wysiwyg-color-black10">Allowed Values</span></th>
+</tr>
+<tr>
+<td style="width: 28.4286%; padding: 8px;">color</td>
+<td style="width: 71.5714%; padding: 8px;">RGB or hex color codes.<br>(ex: RGB (240,30,50,.7), #f015ca)</td>
+</tr>
+<tr>
+<td style="width: 28.4286%; padding: 8px;">background-color</td>
+<td style="width: 71.5714%; padding: 8px;">RGB or hex color codes.<br>(ex: RGB (240,30,50,.7), #f015ca)</td>
+</tr>
+<tr>
+<td style="width: 28.4286%; padding: 8px;">display</td>
+<td style="width: 71.5714%; padding: 8px;">block, inline, inline-block, flex, inline-flex</td>
+</tr>
+<tr>
+<td style="width: 28.4286%; padding: 8px;">justify-content</td>
+<td style="width: 71.5714%; padding: 8px;">center, start, end, flex, flex-start, flex-end, left, right, normal, space-between, space-around, space-evenly</td>
+</tr>
+<tr>
+<td style="width: 28.4286%; padding: 8px;">align-items</td>
+<td style="width: 71.5714%; padding: 8px;">center, start, end, flex, flex-start, flex-end, left, right, normal, stretch</td>
+</tr>
+<tr>
+<td style="width: 28.4286%; padding: 8px;">word-break</td>
+<td style="width: 71.5714%; padding: 8px;">normal, break-all, keep-all, break-word</td>
+</tr>
+<tr>
+<td style="width: 28.4286%; padding: 8px;">box-sizing</td>
+<td style="width: 71.5714%; padding: 8px;">border-box, content-box</td>
+</tr>
+<tr>
+<td style="width: 28.4286%; padding: 8px;">white-space</td>
+<td style="width: 71.5714%; padding: 8px;">normal, no-wrap, pre, pre-wrap, pre-line, break-spaces</td>
+</tr>
+<tr>
+<td style="width: 28.4286%; padding: 8px;">overflow-wrap</td>
+<td style="width: 71.5714%; padding: 8px;">normal, break-word, pre, anywhere</td>
+</tr>
+<tr>
+<td style="width: 28.4286%; padding: 8px;">text-align</td>
+<td style="width: 71.5714%; padding: 8px;">start, end, left, center, right, justify, justify-all, match-parent</td>
+</tr>
+<tr>
+<td style="width: 28.4286%; padding: 8px;">width</td>
+<td style="width: 71.5714%; padding: 8px;">Valid CSS unit values (e.g., 100%, 400px, auto, 2em, etc.)</td>
+</tr>
+<tr>
+<td style="width: 28.4286%; padding: 8px;">height</td>
+<td style="width: 71.5714%; padding: 8px;">Valid CSS unit values (e.g., 100%, 400px, auto, 2em, etc.)</td>
+</tr>
+<tr>
+<td style="width: 28.4286%; padding: 8px;">font-size</td>
+<td style="width: 71.5714%; padding: 8px;">Valid CSS unit values (e.g., 100%, 400px, auto, 2em, etc.)</td>
+</tr>
+<tr>
+<td style="width: 28.4286%; padding: 8px;">font-family</td>
+<td style="width: 71.5714%; padding: 8px;">serif, sans-serif, monospace, cursive, fantasy, system-ui, emoji</td>
+</tr>
+<tr>
+<td style="width: 28.4286%; padding: 8px;">margin</td>
+<td style="width: 71.5714%; padding: 8px;">Valid CSS unit values (e.g., 100%, 400px, auto, 2em, etc.)</td>
+</tr>
+<tr>
+<td style="width: 28.4286%; padding: 8px;">margin-top</td>
+<td style="width: 71.5714%; padding: 8px;">Valid CSS unit values (e.g., 100%, 400px, auto, 2em, etc.)</td>
+</tr>
+<tr>
+<td style="width: 28.4286%; padding: 8px;">margin-right</td>
+<td style="width: 71.5714%; padding: 8px;">Valid CSS unit values (e.g., 100%, 400px, auto, 2em, etc.)</td>
+</tr>
+<tr>
+<td style="width: 28.4286%; padding: 8px;">margin-bottom</td>
+<td style="width: 71.5714%; padding: 8px;">Valid CSS unit values (e.g., 100%, 400px, auto, 2em, etc.)</td>
+</tr>
+<tr>
+<td style="width: 28.4286%; padding: 8px;">margin-left</td>
+<td style="width: 71.5714%; padding: 8px;">Valid CSS unit values (e.g., 100%, 400px, auto, 2em, etc.)</td>
+</tr>
+<tr>
+<td style="width: 28.4286%; padding: 8px;">padding</td>
+<td style="width: 71.5714%; padding: 8px;">Valid CSS unit values (e.g., 100%, 400px, auto, 2em, etc.)</td>
+</tr>
+<tr>
+<td style="width: 28.4286%; padding: 8px;">padding-top</td>
+<td style="width: 71.5714%; padding: 8px;">Valid CSS unit values (e.g., 100%, 400px, auto, 2em, etc.)</td>
+</tr>
+<tr>
+<td style="width: 28.4286%; padding: 8px;">padding-right</td>
+<td style="width: 71.5714%; padding: 8px;">Valid CSS unit values (e.g., 100%, 400px, auto, 2em, etc.)</td>
+</tr>
+<tr>
+<td style="width: 28.4286%; padding: 8px;">padding-bottom</td>
+<td style="width: 71.5714%; padding: 8px;">Valid CSS unit values (e.g., 100%, 400px, auto, 2em, etc.)</td>
+</tr>
+<tr>
+<td style="width: 28.4286%; padding: 8px;">padding-left</td>
+<td style="width: 71.5714%; padding: 8px;">Valid CSS unit values (e.g., 100%, 400px, auto, 2em, etc.)</td>
+</tr>
+<tr>
+<td style="width: 28.4286%; padding: 8px;">border-width</td>
+<td style="width: 71.5714%; padding: 8px;">Valid CSS unit values (e.g., 100%, 400px, auto, 2em, etc.)</td>
+</tr>
+<tr>
+<td style="width: 28.4286%; padding: 8px;">border-style</td>
+<td style="width: 71.5714%; padding: 8px;">none, solid, dashed, inset, outset</td>
+</tr>
+<tr>
+<td style="width: 28.4286%; padding: 8px;">border-color</td>
+<td style="width: 71.5714%; padding: 8px;">RGB or hex color codes (ex: RGB(240,30,50,.7), #f015ca)</td>
+</tr>
+<tr>
+<td style="width: 28.4286%; padding: 8px;">border-top</td>
+<td style="width: 71.5714%; padding: 8px;">Valid CSS unit values (e.g., 100%, 400px, auto, 2em, etc.)</td>
+</tr>
+<tr>
+<td style="width: 28.4286%; padding: 8px;">border-right</td>
+<td style="width: 71.5714%; padding: 8px;">Valid CSS unit values (e.g., 100%, 400px, auto, 2em, etc.)</td>
+</tr>
+<tr>
+<td style="width: 28.4286%; padding: 8px;">border-bottom</td>
+<td style="width: 71.5714%; padding: 8px;">Valid CSS unit values (e.g., 100%, 400px, auto, 2em, etc.)</td>
+</tr>
+<tr>
+<td style="width: 28.4286%; padding: 8px;">border-left</td>
+<td style="width: 71.5714%; padding: 8px;">Valid CSS unit values (e.g., 100%, 400px, auto, 2em, etc.)</td>
+</tr>
+<tr>
+<td style="width: 28.4286%; padding: 8px;">border-radius</td>
+<td style="width: 71.5714%; padding: 8px;">Valid CSS unit values (e.g., 100%, 400px, auto, 2em, etc.)</td>
+</tr>
+<tr>
+<td style="width: 28.4286%; padding: 8px;">border-collapse</td>
+<td style="width: 71.5714%; padding: 8px;">collapse, separate</td>
+</tr>
+</tbody>
+</table>
+<p>&nbsp;</p>
+<h2 id="h_01J2KQD42TBMCRCY5CV1Z80TR4"><strong>Charts:</strong></h2>
+<p>NinjaOne supports Charts.css, a new open-source framework for data visualization. For more information, please see <a href="https://chartscss.org/docs/">Introduction | Charts.css (chartscss.org)</a>.</p>
+<p>NinjaOne recommends using the Piped commands for setting HTML in custom fields via the CLI.&nbsp;</p>
+<pre>$HTML | Ninja-Property-Set-Piped fieldName</pre>
+<p>Example:&nbsp;<br><img src="/hc/article_attachments/28358805604109" alt="image (1).png"></p>
+<pre>&lt;div class="row g-3"&gt;<br>&lt;div class="col-xl-4 col-lg-6 col-md-12 col-sm-12 d-flex"&gt;<br>&lt;table class="charts-css column show-heading"&gt;<br><br><br>&lt;tbody&gt;<br>&lt;tr&gt;<br>&lt;td style="--size: 0.4"&gt; &lt;span class="data"&gt; 40% &lt;/span&gt; &lt;/td&gt;<br>&lt;/tr&gt;<br>&lt;tr&gt;<br>&lt;td style="--size: 0.6"&gt; &lt;span class="data"&gt; 60% &lt;/span&gt; &lt;/td&gt;<br>&lt;/tr&gt;<br>&lt;tr&gt;<br>&lt;td style="--size: 0.75"&gt; &lt;span class="data"&gt; 75% &lt;/span&gt; &lt;/td&gt;<br>&lt;/tr&gt;<br>&lt;tr&gt;<br>&lt;td style="--size: 0.9"&gt; &lt;span class="data"&gt; 90% &lt;/span&gt; &lt;/td&gt;<br>&lt;/tr&gt;<br>&lt;tr&gt;<br>&lt;td style="--size: 1"&gt; &lt;span class="data"&gt; 100% &lt;/span&gt; &lt;/td&gt;<br>&lt;/tr&gt;<br>&lt;/tbody&gt;<br><br>&lt;/table&gt;<br><br>&lt;/div&gt;<br><br>&lt;div class="col-xl-4 col-lg-6 col-md-12 col-sm-12 d-flex"&gt;<br><br>&lt;table class="charts-css column show-data-on-hover show-heading"&gt;<br>&lt;tbody&gt;<br>&lt;tr&gt;<br>&lt;td style="--size: 0.4"&gt; &lt;span class="data"&gt; 40% &lt;/span&gt; &lt;/td&gt;<br>&lt;/tr&gt;<br>&lt;tr&gt;<br>&lt;td style="--size: 0.6"&gt; &lt;span class="data"&gt; 60% &lt;/span&gt; &lt;/td&gt;<br>&lt;/tr&gt;<br>&lt;tr&gt;<br>&lt;td style="--size: 0.75"&gt; &lt;span class="data"&gt; 75% &lt;/span&gt; &lt;/td&gt;<br>&lt;/tr&gt;<br>&lt;tr&gt;<br>&lt;td style="--size: 0.9"&gt; &lt;span class="data"&gt; 90% &lt;/span&gt; &lt;/td&gt;<br>&lt;/tr&gt;<br>&lt;tr&gt;<br>&lt;td style="--size: 1"&gt; &lt;span class="data"&gt; 100% &lt;/span&gt; &lt;/td&gt;<br>&lt;/tr&gt;<br>&lt;/tbody&gt;<br><br>&lt;/table&gt;<br><br>&lt;/div&gt;<br><br>&lt;div class="col-xl-4 col-lg-6 col-md-12 col-sm-12 d-flex"&gt;<br><br>&lt;table class="charts-css bar show-heading"&gt;<br>&lt;tbody&gt;<br>&lt;tr&gt;<br>&lt;td style="--size: 0.4"&gt; &lt;span class="data"&gt; 40% &lt;/span&gt; &lt;/td&gt;<br>&lt;/tr&gt;<br>&lt;tr&gt;<br>&lt;td style="--size: 0.6"&gt; &lt;span class="data"&gt; 60% &lt;/span&gt; &lt;/td&gt;<br>&lt;/tr&gt;<br>&lt;tr&gt;<br>&lt;td style="--size: 0.75"&gt; &lt;span class="data"&gt; 75% &lt;/span&gt; &lt;/td&gt;<br>&lt;/tr&gt;<br>&lt;tr&gt;<br>&lt;td style="--size: 0.9"&gt; &lt;span class="data"&gt; 90% &lt;/span&gt; &lt;/td&gt;<br>&lt;/tr&gt;<br>&lt;tr&gt;<br>&lt;td style="--size: 1"&gt; &lt;span class="data"&gt; 100% &lt;/span&gt; &lt;/td&gt;<br>&lt;/tr&gt;<br>&lt;/tbody&gt;<br><br>&lt;/table&gt;<br><br>&lt;/div&gt;<br><br><br>&lt;div class="col-xl-4 col-lg-6 col-md-12 col-sm-12"&gt;<br>&lt;div class="row g-3"&gt;<br>&lt;div class="col-12"&gt;<br>&lt;table<br>class="charts-css line multiple show-data-on-hover show-labels show-primary-axis show-10-secondary-axes show-heading"&gt;<br>&lt;tbody&gt;<br>&lt;tr&gt;<br>&lt;th scope="row"&gt; 21-03 &lt;/th&gt;<br>&lt;td style="--start: 0.1; --end: 0.3;"&gt;&lt;span class="data"&gt; 30 &lt;/span&gt;&lt;/td&gt;<br>&lt;td style="--start: 0.6; --end: 0.4;"&gt;&lt;span class="data"&gt; 40 &lt;/span&gt;&lt;/td&gt;<br>&lt;td style="--start: 0.8; --end: 0.7;"&gt;&lt;span class="data"&gt; 70 &lt;/span&gt;&lt;/td&gt;<br>&lt;td style="--start: 0.7; --end: 0.9;"&gt;&lt;span class="data"&gt; 100 &lt;/span&gt;&lt;/td&gt;<br>&lt;/tr&gt;<br>&lt;tr&gt;<br>&lt;th scope="row"&gt; 20-03 &lt;/th&gt;<br>&lt;td style="--start: 0.3; --end: 0.1;"&gt;&lt;span class="data"&gt; 10 &lt;/span&gt;&lt;/td&gt;<br>&lt;td style="--start: 0.4; --end: 0.6;"&gt;&lt;span class="data"&gt; 60 &lt;/span&gt;&lt;/td&gt;<br>&lt;td style="--start: 0.7; --end: 0.9;"&gt;&lt;span class="data"&gt; 90 &lt;/span&gt;&lt;/td&gt;<br>&lt;td style="--start: 0.9; --end: 0.7;"&gt;&lt;span class="data"&gt; 70 &lt;/span&gt;&lt;/td&gt;<br>&lt;/tr&gt;<br>&lt;tr&gt;<br>&lt;th scope="row"&gt; 19-03 &lt;/th&gt;<br>&lt;td style="--start: 0.1; --end: 0.3;"&gt;&lt;span class="data"&gt; 30 &lt;/span&gt;&lt;/td&gt;<br>&lt;td style="--start: 0.6; --end: 0.4;"&gt;&lt;span class="data"&gt; 40 &lt;/span&gt;&lt;/td&gt;<br>&lt;td style="--start: 0.9; --end: 0.8;"&gt;&lt;span class="data"&gt; 80 &lt;/span&gt;&lt;/td&gt;<br>&lt;td style="--start: 0.7; --end: 0.9;"&gt;&lt;span class="data"&gt; 90 &lt;/span&gt;&lt;/td&gt;<br>&lt;/tr&gt;<br>&lt;tr&gt;<br>&lt;th scope="row"&gt; 18-03 &lt;/th&gt;<br>&lt;td style="--start: 0.3; --end: 0.1;"&gt;&lt;span class="data"&gt; 10 &lt;/span&gt;&lt;/td&gt;<br>&lt;td style="--start: 0.4; --end: 0.6;"&gt;&lt;span class="data"&gt; 60 &lt;/span&gt;&lt;/td&gt;<br>&lt;td style="--start: 0.8; --end: 0.8;"&gt;&lt;span class="data"&gt; 80 &lt;/span&gt;&lt;/td&gt;<br>&lt;td style="--start: 0.9; --end: 0.9;"&gt;&lt;span class="data"&gt; 90 &lt;/span&gt;&lt;/td&gt;<br>&lt;/tr&gt;<br>&lt;tr&gt;<br>&lt;th scope="row"&gt; 17-03 &lt;/th&gt;<br>&lt;td style="--start: 0.1; --end: 0.3;"&gt;&lt;span class="data"&gt; 30 &lt;/span&gt;&lt;/td&gt;<br>&lt;td style="--start: 0.6; --end: 0.4;"&gt;&lt;span class="data"&gt; 40 &lt;/span&gt;&lt;/td&gt;<br>&lt;td style="--start: 0.8; --end: 1.0;"&gt;&lt;span class="data"&gt; 100 &lt;/span&gt;&lt;/td&gt;<br>&lt;td style="--start: 0.9; --end: 0.7;"&gt;&lt;span class="data"&gt; 70 &lt;/span&gt;&lt;/td&gt;<br>&lt;/tr&gt;<br>&lt;/tbody&gt;<br>&lt;/table&gt;<br><br>&lt;/div&gt;<br>&lt;div class="col-12"&gt;<br><br>&lt;ul class="charts-css legend legend-inline legend-rectangle"&gt;<br>&lt;li&gt; C: &lt;/li&gt;<br>&lt;li&gt; D: &lt;/li&gt;<br>&lt;li&gt; CPU &lt;/li&gt;<br>&lt;li&gt; Memory &lt;/li&gt;<br>&lt;/ul&gt;<br><br>&lt;/div&gt;<br>&lt;/div&gt;<br>&lt;/div&gt;<br><br><br><br><br>&lt;div class="col-xl-4 col-lg-6 col-md-12 col-sm-12 d-flex"&gt;<br><br>&lt;table class="charts-css area show-heading"&gt;<br>&lt;tbody&gt;<br>&lt;tr&gt;<br>&lt;th scope="row"&gt; 21-03 &lt;/th&gt;<br>&lt;td style="--start: 0.1; --end: 0.3;"&gt;&lt;span class="data"&gt; 30 &lt;/span&gt;&lt;/td&gt;<br>&lt;td style="--start: 0.6; --end: 0.4;"&gt;&lt;span class="data"&gt; 40 &lt;/span&gt;&lt;/td&gt;<br>&lt;td style="--start: 0.8; --end: 0.7;"&gt;&lt;span class="data"&gt; 70 &lt;/span&gt;&lt;/td&gt;<br>&lt;td style="--start: 0.7; --end: 0.9;"&gt;&lt;span class="data"&gt; 100 &lt;/span&gt;&lt;/td&gt;<br>&lt;/tr&gt;<br>&lt;tr&gt;<br>&lt;th scope="row"&gt; 20-03 &lt;/th&gt;<br>&lt;td style="--start: 0.3; --end: 0.1;"&gt;&lt;span class="data"&gt; 10 &lt;/span&gt;&lt;/td&gt;<br>&lt;td style="--start: 0.4; --end: 0.6;"&gt;&lt;span class="data"&gt; 60 &lt;/span&gt;&lt;/td&gt;<br>&lt;td style="--start: 0.7; --end: 0.9;"&gt;&lt;span class="data"&gt; 90 &lt;/span&gt;&lt;/td&gt;<br>&lt;td style="--start: 0.9; --end: 0.7;"&gt;&lt;span class="data"&gt; 70 &lt;/span&gt;&lt;/td&gt;<br>&lt;/tr&gt;<br>&lt;tr&gt;<br>&lt;th scope="row"&gt; 19-03 &lt;/th&gt;<br>&lt;td style="--start: 0.1; --end: 0.3;"&gt;&lt;span class="data"&gt; 30 &lt;/span&gt;&lt;/td&gt;<br>&lt;td style="--start: 0.6; --end: 0.4;"&gt;&lt;span class="data"&gt; 40 &lt;/span&gt;&lt;/td&gt;<br>&lt;td style="--start: 0.9; --end: 0.8;"&gt;&lt;span class="data"&gt; 80 &lt;/span&gt;&lt;/td&gt;<br>&lt;td style="--start: 0.7; --end: 0.9;"&gt;&lt;span class="data"&gt; 90 &lt;/span&gt;&lt;/td&gt;<br>&lt;/tr&gt;<br>&lt;tr&gt;<br>&lt;th scope="row"&gt; 18-03 &lt;/th&gt;<br>&lt;td style="--start: 0.3; --end: 0.1;"&gt;&lt;span class="data"&gt; 10 &lt;/span&gt;&lt;/td&gt;<br>&lt;td style="--start: 0.4; --end: 0.6;"&gt;&lt;span class="data"&gt; 60 &lt;/span&gt;&lt;/td&gt;<br>&lt;td style="--start: 0.8; --end: 0.8;"&gt;&lt;span class="data"&gt; 80 &lt;/span&gt;&lt;/td&gt;<br>&lt;td style="--start: 0.9; --end: 0.9;"&gt;&lt;span class="data"&gt; 90 &lt;/span&gt;&lt;/td&gt;<br>&lt;/tr&gt;<br>&lt;tr&gt;<br>&lt;th scope="row"&gt; 17-03 &lt;/th&gt;<br>&lt;td style="--start: 0.1; --end: 0.3;"&gt;&lt;span class="data"&gt; 30 &lt;/span&gt;&lt;/td&gt;<br>&lt;td style="--start: 0.6; --end: 0.4;"&gt;&lt;span class="data"&gt; 40 &lt;/span&gt;&lt;/td&gt;<br>&lt;td style="--start: 0.8; --end: 1.0;"&gt;&lt;span class="data"&gt; 100 &lt;/span&gt;&lt;/td&gt;<br>&lt;td style="--start: 0.9; --end: 0.7;"&gt;&lt;span class="data"&gt; 70 &lt;/span&gt;&lt;/td&gt;<br>&lt;/tr&gt;<br>&lt;/tbody&gt;<br>&lt;/table&gt;<br>&lt;/div&gt;<br><br><br><br><br>&lt;div class="col-xl-4 col-lg-6 col-md-12 col-sm-12 d-flex" style="height:300px; width: 300px;"&gt;<br><br>&lt;table class="charts-css pie show-heading"&gt;<br>&lt;tbody&gt;<br>&lt;tr&gt;<br>&lt;th scope="row"&gt; 21-03 &lt;/th&gt;<br>&lt;td style="--start: 0; --end: 0.2;"&gt;&lt;span class="data"&gt; 30 &lt;/span&gt;&lt;/td&gt;<br>&lt;/tr&gt;<br>&lt;tr&gt;<br>&lt;th scope="row"&gt; 20-03 &lt;/th&gt;<br>&lt;td style="--start: 0.2; --end: 0.3;"&gt;&lt;span class="data"&gt; 10 &lt;/span&gt;&lt;/td&gt;<br>&lt;/tr&gt;<br>&lt;tr&gt;<br>&lt;th scope="row"&gt; 19-03 &lt;/th&gt;<br>&lt;td style="--start: 0.3; --end: 0.55;"&gt;&lt;span class="data"&gt; 30 &lt;/span&gt;&lt;/td&gt;<br>&lt;/tr&gt;<br>&lt;tr&gt;<br>&lt;th scope="row"&gt; 18-03 &lt;/th&gt;<br>&lt;td style="--start: 0.55; --end: 0.75;"&gt;&lt;span class="data"&gt; 10 &lt;/span&gt;&lt;/td&gt;<br>&lt;/tr&gt;<br>&lt;tr&gt;<br>&lt;th scope="row"&gt; 17-03 &lt;/th&gt;<br>&lt;td style="--start: 0.75; --end: 1;"&gt;&lt;span class="data"&gt; 30 &lt;/span&gt;&lt;/td&gt;<br>&lt;/tr&gt;<br>&lt;/tbody&gt;<br>&lt;/table&gt;<br>&lt;/div&gt;<br>&lt;/div&gt;</pre>
+<p>&nbsp;</p>
+<h2 id="h_01HDRZAQQ2NFT266GR78NSJKRQ"><strong>NinjaOne CSS Classes:</strong></h2>
+<p>NinjaOne documentation and custom fields supports the Bootstrap 5 Grid System and the Free Font Awesome 6 Library for icons. In addition, we provide several classes to allow technicians to access the NinjaOne styles.</p>
+<ul>
+<li><a href="#h_01HDRZDAS4S7E8X35550TXN8JR">Standard Card</a></li>
+<li><a href="#h_01HDRZNSB3C3X2ZFXS7B4VKNBX">Card with Action</a></li>
+<li><a href="#h_01HDRZVT0P5J0BB6TSWYBEGSYP">Tables</a></li>
+<li><a href="#h_01HDS07JT8W1BZVSK8WR2P9NPC">Paragraphs</a></li>
+<li><a href="#h_01HDS07JT87RMD5SR4G2ZJ3D60">Headings</a></li>
+<li><a href="#h_01HDS07JT85C67J4YY60AC4CHK">Buttons</a></li>
+<li><a href="#h_01HDS07JT8TH000P4FT4BTX7X5">Info Cards</a></li>
+<li><a href="#h_01HDS0N1BXFYJ1HZGSZY0EXHC6">Tags</a></li>
+<li><a href="#h_01HDS0N1BXTFZQCVXB46HG36V7">Statistic Cards</a></li>
+<li><a href="#h_01HDS0TY4XAW3XB7H930FR43HK">Line Chart</a></li>
+</ul>
+<p>&nbsp;</p>
+<h3 id="h_01HDRZDAS4S7E8X35550TXN8JR"><strong>Standard Card</strong></h3>
+<p><img src="/hc/article_attachments/29496648026509" alt="standard card.png" width="418" height="400"></p>
+<pre data-renderer-start-pos="1">&lt;div class="card flex-grow-1"&gt;<br>  &lt;div class="card-title-box"&gt;<br>    &lt;div class="card-title"&gt;&lt;i class="fas fa-building"&gt;&lt;/i&gt;&amp;nbsp;&amp;nbsp;Tenant Details&lt;/div&gt;<br>  &lt;/div&gt;<br>  &lt;div class="card-body"&gt;<br>    &lt;p class="card-text"&gt;&lt;/p&gt;<br>    &lt;p&gt;&lt;b&gt;Tenant Name&lt;/b&gt;&lt;br&gt;Example Customer&lt;/p&gt;<br>    &lt;p&gt;&lt;b&gt;Default Domain&lt;/b&gt;&lt;br&gt;example.onmicrosoft.com&lt;/p&gt;<br>    &lt;p&gt;&lt;b&gt;Tenant ID&lt;/b&gt;&lt;br&gt;123456-123432-234324-432463452-123&lt;/p&gt;<br>    &lt;p&gt;&lt;b&gt;Creation Date&lt;/b&gt;&lt;br&gt;07/18/2023 10:51:46&lt;/p&gt;<br>    &lt;p&gt;&lt;b&gt;Domains&lt;/b&gt;&lt;br&gt;example.onmicrosoft.com<br>    &lt;/p&gt;<br>    &lt;p&gt;&lt;b&gt;Admin Users&lt;/b&gt;&lt;br&gt;EXO_App2, MOD Administrator, MOD Administrator, Microsoft Service Account, Allan<br>       Deyoung, Nestor Wilke, Isaiah Langer, Megan Bowen, Lidia Holloway&lt;/p&gt;<br>    &lt;p&gt;&lt;/p&gt;<br>  &lt;/div&gt;<br>&lt;/div&gt;</pre>
+<p data-renderer-start-pos="1">&nbsp;</p>
+<h3 id="h_01HDRZNSB3C3X2ZFXS7B4VKNBX" data-renderer-start-pos="1"><strong>Card with Action</strong></h3>
+<p><img src="/hc/article_attachments/29496648029197" alt="card with actions.png" width="421" height="317"></p>
+<pre>&lt;div class="card flex-grow-1"&gt;<br>  &lt;div class="card-title-box"&gt;<br>    &lt;div class="card-title"&gt;&lt;i class="fas fa-shield-halved"&gt;&lt;/i&gt;&amp;nbsp;&amp;nbsp;CIPP Applied Standards&lt;/div&gt;<br>    &lt;div class="card-link-box"&gt;&lt;a<br>           href="https://localhost:4280/tenant/standards/list-applied-standards?customerId=1e593540-8f80-4831-87a9-f1f95804a206"<br>           target="_blank" class="card-link" rel="nofollow noopener noreferrer"&gt;&lt;i<br>              class="fas fa-arrow-up-right-from-square" style="color: #337ab7;"&gt;&lt;/i&gt;&lt;/a&gt;&lt;/div&gt;<br>  &lt;/div&gt;<br>  &lt;div class="card-body"&gt;<br>    &lt;p class="card-text"&gt;&lt;/p&gt;<br>    &lt;ul&gt;<br>        &lt;li&gt;&lt;span&gt;Disable Self Service Licensing (AllTenants)&lt;/span&gt;&lt;/li&gt;<br>        &lt;li&gt;&lt;span&gt;Enable Usernames instead of pseudo anonymised names in reports<br>                (example.onmicrosoft.com)&lt;/span&gt;&lt;/li&gt;<br>    &lt;/ul&gt;<br>    &lt;p&gt;&lt;/p&gt;<br>  &lt;/div&gt;<br>&lt;/div&gt;</pre>
+<p>&nbsp;</p>
+<h3 id="h_01HDRZVT0P5J0BB6TSWYBEGSYP"><strong>Tables</strong></h3>
+<p><img src="/hc/article_attachments/29496616553997" alt="tables.png"></p>
+<pre>&lt;table&gt;<br>  &lt;thead&gt;<br>    &lt;tr&gt;<br>       &lt;th&gt;Testing&lt;/th&gt;<br>       &lt;th&gt;Testing&lt;/th&gt;<br>       &lt;th&gt;Testing&lt;/th&gt;<br>       &lt;th&gt;Testing&lt;/th&gt;<br>       &lt;th&gt;Testing&lt;/th&gt;<br>       &lt;th&gt;Testing&lt;/th&gt;<br>       &lt;th&gt;Testing&lt;/th&gt;<br>       &lt;th&gt;Testing&lt;/th&gt;<br>       &lt;th&gt;Testing&lt;/th&gt;<br>    &lt;/tr&gt;<br>  &lt;/thead&gt;<br>  &lt;tbody&gt;<br>    &lt;tr&gt;<br>       &lt;td&gt;Testing&lt;/td&gt;<br>       &lt;td&gt;Testing&lt;/td&gt;<br>       &lt;td&gt;testing&lt;/td&gt;<br>       &lt;td&gt;Testing&lt;/td&gt;<br>       &lt;td&gt;Testing this one has a lot longer text testing testing testing&lt;/td&gt;<br>       &lt;td&gt;testing&lt;/td&gt;<br>       &lt;td&gt;Testing&lt;/td&gt;<br>       &lt;td&gt;Testing&lt;/td&gt;<br>       &lt;td&gt;testing&lt;/td&gt;<br>    &lt;/tr&gt;<br>    &lt;tr class="danger"&gt;<br>       &lt;td&gt;Testing&lt;/td&gt;<br>       &lt;td&gt;Testing this one has a lot longer text testing testing testing&lt;/td&gt;<br>       &lt;td&gt;Testing&lt;/td&gt;<br>       &lt;td&gt;testing&lt;/td&gt;<br>       &lt;td&gt;Testing&lt;/td&gt;<br>       &lt;td&gt;testing&lt;/td&gt;<br>       &lt;td&gt;Testing&lt;/td&gt;<br>       &lt;td&gt;Testing&lt;/td&gt;<br>       &lt;td&gt;testing&lt;/td&gt;<br>    &lt;/tr&gt;<br>    &lt;tr class="success"&gt;<br>       &lt;td&gt;Testing&lt;/td&gt;<br>       &lt;td&gt;Testing&lt;/td&gt;<br>       &lt;td&gt;testing&lt;/td&gt;<br>       &lt;td&gt;Testing&lt;/td&gt;<br>       &lt;td&gt;Testing this one has a lot longer text testing testing testing&lt;/td&gt;<br>       &lt;td&gt;testing&lt;/td&gt;<br>       &lt;td&gt;Testing&lt;/td&gt;<br>       &lt;td&gt;Testing&lt;/td&gt;<br>       &lt;td&gt;testing&lt;/td&gt;<br>    &lt;/tr&gt;<br>    &lt;tr class="other"&gt;<br>       &lt;td&gt;Testing&lt;/td&gt;<br>       &lt;td&gt;Testing&lt;/td&gt;<br>       &lt;td&gt;testing&lt;/td&gt;<br>       &lt;td&gt;Testing&lt;/td&gt;<br>       &lt;td&gt;Testing this one has a lot longer text testing testing testing&lt;/td&gt;<br>       &lt;td&gt;testing&lt;/td&gt;<br>       &lt;td&gt;Testing&lt;/td&gt;<br>       &lt;td&gt;Testing&lt;/td&gt;<br>       &lt;td&gt;testing&lt;/td&gt;<br>    &lt;/tr&gt;<br>    &lt;tr class="warning"&gt;<br>       &lt;td&gt;Testing&lt;/td&gt;<br>       &lt;td&gt;Testing&lt;/td&gt;<br>       &lt;td&gt;testing&lt;/td&gt;<br>       &lt;td&gt;Testing&lt;/td&gt;<br>       &lt;td&gt;Testing this one has a lot longer text testing testing testing&lt;/td&gt;<br>       &lt;td&gt;testing&lt;/td&gt;<br>       &lt;td&gt;Testing&lt;/td&gt;<br>       &lt;td&gt;Testing&lt;/td&gt;<br>       &lt;td&gt;testing&lt;/td&gt;<br>    &lt;/tr&gt;<br>    &lt;tr class="unknown"&gt;<br>       &lt;td&gt;Testing&lt;/td&gt;<br>       &lt;td&gt;Testing&lt;/td&gt;<br>       &lt;td&gt;testing&lt;/td&gt;<br>       &lt;td&gt;Testing&lt;/td&gt;<br>       &lt;td&gt;Testing this one has a lot longer text testing testing testing&lt;/td&gt;<br>       &lt;td&gt;testing&lt;/td&gt;<br>       &lt;td&gt;Testing&lt;/td&gt;<br>       &lt;td&gt;Testing&lt;/td&gt;<br>       &lt;td&gt;testing&lt;/td&gt;<br>    &lt;/tr&gt;<br>  &lt;/tbody&gt;<br>&lt;/table&gt;</pre>
+<p>&nbsp;</p>
+<h3 id="h_01HDS07JT8W1BZVSK8WR2P9NPC"><strong>Paragraphs</strong></h3>
+<p><strong><img src="/hc/article_attachments/29496616554509" alt="paragraphs.png"></strong></p>
+<pre>&lt;p&gt;This is an example paragraph Lorem ipsum dolor sit amet, consectetur adipiscing elit. Lorem ipsum dolor sit<br>   amet, consectetur adipiscing elit. Lorem ipsum dolor sit amet, consectetur adipiscing elit.&lt;/p&gt;<br>&lt;p&gt;Lorem ipsum dolor sit amet, consectetur adipiscing elit. &lt;strong&gt;Bold Text&lt;/strong&gt; Lorem ipsum dolor sit<br>   amet, consectetur adipiscing elit.&lt;/p&gt;</pre>
+<p>&nbsp;</p>
+<h3 id="h_01HDS07JT87RMD5SR4G2ZJ3D60"><strong>Headings</strong></h3>
+<p><strong><img src="/hc/article_attachments/29496648033037" alt="headings.png" width="145" height="197"></strong></p>
+<pre>&lt;h1&gt;Headings&lt;/h1&gt;<br>&lt;h1&gt;Heading 1&lt;/h1&gt;<br>&lt;h2&gt;Heading 2&lt;/h2&gt;<br>&lt;h3&gt;Heading 3&lt;/h3&gt;<br>&lt;h4&gt;Heading 4&lt;/h4&gt;<br>&lt;h5&gt;Heading 5&lt;/h5&gt;</pre>
+<p>&nbsp;</p>
+<h3 id="h_01HDS07JT85C67J4YY60AC4CHK"><strong>Buttons</strong></h3>
+<p><strong><img src="/hc/article_attachments/29496648036109" alt="button.png" width="374" height="50"></strong></p>
+<pre>&lt;a href="https://example.com" target="_blank" class="btn"&gt;Primary Button&lt;/a&gt;<br>&lt;a href="https://example.com" target="_blank" class="btn secondary"&gt;Secondary Button&lt;/a&gt;<br>&lt;a href="https://example.com" target="_blank" class="btn danger"&gt;Danger Button&lt;/a&gt;</pre>
+<p>&nbsp;</p>
+<h3 id="h_01HDS07JT8TH000P4FT4BTX7X5"><strong>Info Cards</strong></h3>
+<p><img src="/hc/article_attachments/29496648037261" alt="info cards.png" width="544" height="230"></p>
+<pre>&lt;div class="info-card"&gt;<br>  &lt;i class="info-icon fa-solid fa-circle-info"&gt;&lt;/i&gt;<br>  &lt;div class="info-text"&gt;<br>    &lt;div class="info-title"&gt;Informational title&lt;/div&gt;<br>    &lt;div class="info-description"&gt;<br>      Lorem ipsum dolor sit amet, consectetur adipiscing elit.<br>    &lt;/div&gt;<br>  &lt;/div&gt;<br>&lt;/div&gt;<br><br><br>&lt;div class="info-card error"&gt;<br>  &lt;i class="info-icon fa-solid fa-circle-exclamation"&gt;&lt;/i&gt;<br>  &lt;div class="info-text"&gt;<br>    &lt;div class="info-title"&gt;Error title&lt;/div&gt;<br>    &lt;div class="info-description"&gt;<br>      Lorem ipsum dolor sit amet, consectetur adipiscing elit.<br>    &lt;/div&gt;<br>  &lt;/div&gt;<br>&lt;/div&gt;<br><br><br>&lt;div class="info-card warning"&gt;<br>  &lt;i class="info-icon fa-solid fa-triangle-exclamation"&gt;&lt;/i&gt;<br>  &lt;div class="info-text"&gt;<br>    &lt;div class="info-title"&gt;Warning title&lt;/div&gt;<br>    &lt;div class="info-description"&gt;<br>      Lorem ipsum dolor sit amet, consectetur adipiscing elit.<br>    &lt;/div&gt;<br>  &lt;/div&gt;<br>&lt;/div&gt;<br><br><br>&lt;div class="info-card success"&gt;<br>  &lt;i class="info-icon fa-solid fa-circle-check"&gt;&lt;/i&gt;<br>  &lt;div class="info-text"&gt;<br>    &lt;div class="info-title"&gt;Success title&lt;/div&gt;<br>    &lt;div class="info-description"&gt;<br>      Lorem ipsum dolor sit amet, consectetur adipiscing elit.<br>    &lt;/div&gt;<br>  &lt;/div&gt;<br>&lt;/div&gt;</pre>
+<p>&nbsp;</p>
+<h3 id="h_01HDS0N1BXFYJ1HZGSZY0EXHC6"><strong>Tags</strong></h3>
+<p><strong><img src="/hc/article_attachments/29496648037517" alt="tags.png" width="215" height="41"></strong></p>
+<pre>&lt;div class="tag"&gt;Enabled&lt;/div&gt;<br>&lt;div class="tag disabled"&gt;Disabled&lt;/div&gt;<br>&lt;div class="tag expired"&gt;Expired&lt;/div&gt;</pre>
+<p>&nbsp;</p>
+<h3 id="h_01HDS0N1BXTFZQCVXB46HG36V7"><strong>Statistic Cards</strong></h3>
+<p><img src="/hc/article_attachments/29496616562957" alt="statistic cards.png" width="512" height="131"></p>
+<pre>&lt;div class="stat-card"&gt;<br>  &lt;div class="stat-value"&gt;&lt;a href="https://example.com" target="_blank" rel="nofollow noopener noreferrer"&gt;&lt;span<br>              style="color: #CCCCCC;"&gt;&lt;i class="fas fa-circle-xmark"&gt;&lt;/i&gt;&lt;/span&gt;&lt;/a&gt;&lt;/div&gt;<br>  &lt;div class="stat-desc"&gt;&lt;a href="https://example.com" target="_blank" rel="nofollow noopener noreferrer"&gt;&lt;span<br>              style="font-size: 18px;"&gt;&lt;span style="white-space:nowrap;"&gt;AD&lt;/span&gt;&amp;nbsp;&lt;span<br>                  style="white-space:nowrap;"&gt;Connect&lt;/span&gt;&lt;/span&gt;&lt;/a&gt;&lt;/div&gt;<br>&lt;/div&gt;<br><br>&lt;div class="stat-card"&gt;<br>  &lt;div class="stat-value"&gt;&lt;a href="https://example.com" target="_blank" rel="nofollow noopener noreferrer"<br>            style="color: #008001;"&gt;0&lt;/a&gt;&lt;/div&gt;<br>  &lt;div class="stat-desc"&gt;&lt;a href="https://example.com" target="_blank" rel="nofollow noopener noreferrer"&gt;&lt;span<br>              style="font-size: 18px;"&gt;Blocked Senders&lt;/span&gt;&lt;/a&gt;&lt;/div&gt;<br>&lt;/div&gt;</pre>
+<p>&nbsp;</p>
+<h3 id="h_01HDS0TY4XAW3XB7H930FR43HK"><strong>Line Chart</strong></h3>
+<p><strong><img src="/hc/article_attachments/29496616565133" alt="line chart.png" width="466" height="88"></strong></p>
+<pre>&lt;div class="p-3 linechart"&gt;<br>   &lt;div style="width: 33.3333333333%; background-color: #55ACBF;"&gt;&lt;/div&gt;<br>   &lt;div style="width: 33.3333333333%; background-color: #3633B7;"&gt;&lt;/div&gt;<br>   &lt;div style="width: 33.3333333333%; background-color: #8063BF;"&gt;&lt;/div&gt;<br>&lt;/div&gt;<br>&lt;ul class="unstyled p-3" style="display: flex; justify-content: space-between; "&gt;<br>   &lt;li&gt;&lt;span class="chart-key" style="background-color: #55ACBF;"&gt;&lt;/span&gt;&lt;span&gt;<br>      Licensed (20)&lt;/span&gt;&lt;/li&gt;<br>   &lt;li&gt;&lt;span class="chart-key" style="background-color: #3633B7;"&gt;&lt;/span&gt;&lt;span&gt;<br>      Unlicensed (20)&lt;/span&gt;&lt;/li&gt;<br>   &lt;li&gt;&lt;span class="chart-key" style="background-color: #8063BF;"&gt;&lt;/span&gt;&lt;span&gt;<br>      Guests (20)&lt;/span&gt;&lt;/li&gt;<br>&lt;/ul&gt;</pre>
+<p>&nbsp;</p>
+<p>Related Documentation:&nbsp;</p>
+<ul>
+<li><a href="/hc/en-us/articles/15666684461581" target="_blank" rel="noopener noreferrer">Custom Fields: View and Modify</a></li>
+<li><a href="/hc/en-us/articles/360061218431" target="_blank" rel="noopener noreferrer">NinjaOne Documentation: Apps &amp; Services</a></li>
+</ul>
+        </div>
