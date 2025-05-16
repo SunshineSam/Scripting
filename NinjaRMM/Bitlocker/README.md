@@ -11,7 +11,7 @@
 - $UseTpmProtector ➜ checkbox; use TPM with BitLocker
 - $BackupToAD ➜ checkbox; store recovery key in AD device object
 - $UseUsedSpaceOnly ➜ checkbox; only applicable when enabling from a complete off state
-- $AutoReboot ➜ AutoReboot the device after execution
+- $AutoReboot ➜ checkbox; reboot the device after execution
 - $SaveLogToDevice ➜ checkbox; save a local log. See details in script
 
 ### === Other Management Options ⤴ ===
@@ -22,7 +22,7 @@
 ### === Status Scripts Options ===
 #### RMM Input Options
 - $UpdateRecoveryKey ➜ checkbox; optionally store the recovery key when run (if applicable)
-- $MountPoint ➜ Hard set via variable fallback to System Drive
+- $MountPoint ➜ string; variable fallback to System Drive
 - $SaveLogToDevice ➜ checkbox; save a local log. See details in script
 
 ### === Custom Secure Fields ===
