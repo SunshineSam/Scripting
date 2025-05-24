@@ -1,17 +1,32 @@
 #Requires -Version 5.1
+<#
+    === Created by Sam ===
+    Last Edit: 05-19-2025
+
+    Note:
+    05-23-2025: Cleanup, big fixes, and consistency, testing
+    05-22-2025: Rewrite for multi-volume handling, improved saftey, and use case
+    05-19-2025: General cleanup improvements
+    04-25-2025: Creation and validation testing
+#>
 
 <#
 .SYNOPSIS
-    Manage Bitlocker end-to-end and generate a status card for NinjaRMM.
+    Manage BitLocker end-to-end across one or more volumes and generate HTML status cards for NinjaRMM.
 
 .DESCRIPTION
-    This script manages Bitlocker operations (enable, suspend, disable) on a specified volume,
-    generates an HTML status card with Bitlocker details, and updates a NinjaRMM WYSIWYG custom field.
-    The recovery key is stored separately in a secure custom field. Designed to run on a schedule
-    for monitoring and management purposes.
+    This advanced script can Enable, Suspend or Disable BitLocker on multiple drives
+    (or **all** fixed disks), manage TPM/recovery-key protectors, store settings in
+    the registry, and publish both status card(s) and secure recovery key(s) to NinjaRMM.
+    Recovery keys for all processed drives/ volumes are stored in a single secure custom field
+    in a structured text format (e.g., "Volume: C: - ID: {GUID} | Key: {Key}; Volume: D: - ID: {GUID} | Key: {Key}; ").
+    Drive: C: - N/A; Drive: D: - N/A
+
+.PARAMETER ApplyToAllFixedDisk
+    Switch. If set, ignores -MountPoint and targets all fixed disk in the system
 
 .PARAMETER MountPoint
-    Target drive letter or mount point (defaults to system drive or env:bitlockerMountPoint).
+    Target specific drive letter(s). Example: C:, D: (or defaults to system drive).
 
 .PARAMETER BitLockerProtection
     Dropdown: Enable, Suspend, or Disable protection (required).
@@ -20,22 +35,22 @@
     Dropdown: Ensure, Rotate, or Remove numeric recovery key (required).
 
 .PARAMETER BitlockerEncryptionMethod
-    Dropdown: Aes128, Aes256, XtsAes128, or XtsAes256 Bitlocker encryption method (required).
+    Dropdown: Aes128, Aes256, XtsAes128, or XtsAes256 Bitlocker encryption method (required when enabling; Defaults to XtsAes256).
 
 .PARAMETER BackupToAD
-    Switch to backup recovery keys to AD.
+    Switch to backup recovery keys to AD/ AAD (Intune).
 
 .PARAMETER AutoReboot
-    Switch to reboot after Enable or Suspend.
+    Switch to reboot after Enablement. (default falase)
 
 .PARAMETER SuspensionRebootCount
     Number of reboots to allow for suspended protection (default 1).
 
 .PARAMETER UseUsedSpaceOnly
-    Set encryption for used space only.
+    Set encryption for used space only. (only valid when enabling from a complete off state)
 
 .PARAMETER SaveLogToDevice
-    If specified, logs are saved to C:\Logs\BitLockerScript.log on the device.
+    If specified, logs are saved to <SystemDrive>:\Logs\BitLockerScript.log on the device.
 
 .PARAMETER BitLockerStatusFieldName
     The name of the NinjaRMM custom field to update with the Bitlocker status card.
@@ -49,7 +64,7 @@
 [CmdletBinding()]
 param(
     # Drive letter (mount point)
-    [string]$MountPoint = $(if ($env:bitlockerMountPoint) { $env:bitlockerMountPoint } else { (Get-CimInstance Win32_OperatingSystem).SystemDrive }),
+    [string[]]$MountPoint = $(if ($env:bitlockerMountPoint) { $env:bitlockerMountPoint -split ',' } else { @((Get-CimInstance Win32_OperatingSystem).SystemDrive) }),
     
     # Dropdown options
     [ValidateSet("Enable", "Suspend", "Disable")][string]$BitLockerProtection = $(if ($env:bitlockerProtection) { $env:bitlockerProtection } else { "Enable" }),
@@ -58,6 +73,7 @@ param(
     
     # Remaining independent switches
     [switch]$UseTpmProtector = $(if ($env:useBitlockerTpmProtector) { [Convert]::ToBoolean($env:useBitlockerTpmProtector) } else { $true }),
+    [switch]$ApplyToAllFixedDisk = $(if ($env:applyToAllFixedDisk) { [Convert]::ToBoolean($env:applyToAllFixedDisk) } else { $true }),
     [switch]$UseUsedSpaceOnly = $(if ($env:encryptUsedspaceonly) { [Convert]::ToBoolean($env:encryptUsedspaceonly) } else { $true }),
     [switch]$BackupToAD  = $(if ($env:bitlockerBackupToAd) { [Convert]::ToBoolean($env:bitlockerBackupToAd) } else { $false }),
     [switch]$AutoReboot = $(if ($env:bitlockerAutoReboot) { [Convert]::ToBoolean($env:bitlockerAutoReboot) } else { $false }),
@@ -72,14 +88,16 @@ param(
     # Card customization options
     [string]$CardTitle = "Bitlocker Status",  # Default title
     [string]$CardIcon = "fas fa-shield-alt",  # Default icon
-    [string]$CardBackgroundGradient = "Default",  # Gradiant not supported with Ninja. 'Default' omits the style.
+    [string]$CardBackgroundGradient = "Default",  # Gradiant not supported with NinjaRMM. 'Default' omits the style.
     [string]$CardBorderRadius = "10px",  # Default border radius
+    [string]$CardSeparationMargin = "0 8px", # Default distance between cards
+    # CardIconColor is dynamically generated in this case
     
-    # Variable to ensure both TPM and Recovery Key protectors are always present (when true).
+    # Variable to ensure both TPM and Recovery Key protectors are always present (when true). Subsequently trevents recovery key prompt on every boot.
     [switch]$PreventKeyPromptOnEveryBoot = $(if ($env:preventKeyPromptOnEveryBoot) { [Convert]::ToBoolean($env:preventKeyPromptOnEveryBoot) } else { $true }),  # Set to $false to allow Bitlocker without TPM
     
     # Registry path for storing unretreivable states
-    [string]$BitLockerStateManagementPath = $(if ($env:bitLockerStateManagementPath) { $env:bitLockerStateManagementPath } else { "HKLM:\SOFTWARE\BitLockerManagement" }),
+    [string]$BitLockerStateStoragePath = $(if ($env:bitLockerStateStoragePath) { $env:bitLockerStateStoragePath } else { "HKLM:\SOFTWARE\BitLockerManagement" }),
     # Storing UsedSpaceOnly setting
     [string]$UsedSpaceOnlyStateValueName = $(if ($env:usedSpaceOnlyStateValueName) { $env:usedSpaceOnlyStateValueName } else { "UsedSpaceOnly" })
 )
@@ -90,30 +108,95 @@ param(
 begin {
     
     # Immediate check if running with administrator privileges
-    $isAdmin = [Security.Principal.WindowsPrincipal]::new(
-        [Security.Principal.WindowsIdentity]::GetCurrent()
-    ).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    $isAdmin = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
     if (-not $isAdmin) {
-        Write-Host "Administrator privileges required"
+        Write-Host "`nAdministrator privileges required"
         exit 1
     }
-    Write-Host "Running as Administrator"
-    
-    Write-Host "`n=== Initialization & Validation ==="
+    Write-Host "`nRunning as Administrator"
     
     ##############
     # Validation #
     ##############
-    
-    # Validate MountPoint
-    $MountPoint = $MountPoint.Trim()
-    if ($MountPoint -notmatch '^[A-Za-z]:\\?$') {
-        Write-Host "[ERROR] MountPoint '$MountPoint' must be a valid drive letter (e.g., 'C:')"
-        exit 1
+
+    Write-Host "`n=== Initialization & Validation ==="
+
+    # Helper Function: Called early to check for drive dependencies (e.g., RAID or spanned volumes)
+    function Test-DriveDependencies {
+        Write-Host "[INFO] Checking for drive dependencies that may affect BitLocker operations"
+        try {
+            $physicalDisks = Get-PhysicalDisk
+            $disks = Get-Disk
+            foreach ($disk in $disks) {
+                if ($disk.OperationalStatus -eq 'RAID' -or $disk.PartitionStyle -eq 'Unknown') {
+                    Write-Host "[WARNING] Detected RAID or non-standard disk configuration on Disk $($disk.Number). BitLocker operations may fail."
+                }
+                if ($disk.IsBoot -and $disk.NumberOfPartitions -gt 1) {
+                    Write-Host "[INFO] Multiple partitions detected on boot disk. Ensure BitLocker is applied to the correct volume."
+                }
+            }
+            $spannedVolumes = Get-Volume | Where-Object { $_.FileSystemType -eq 'NTFS' -and $_.DriveType -eq 'Fixed' } | 
+                Where-Object { (Get-Partition -Volume $_).DiskNumber.Count -gt 1 }
+            if ($spannedVolumes) {
+                Write-Host "[WARNING] Detected spanned volumes: $($spannedVolumes.DriveLetter -join ', '). BitLocker may not support these configurations."
+            }
+            Write-Host "[SUCCESS] Drive dependency check completed"
+        }
+        catch {
+            Write-Host "[ERROR] Failed to check drive dependencies: $_"
+        }
     }
-    if (-not (Test-Path $MountPoint -PathType Container)) {
-        Write-Host "[ERROR] MountPoint '$MountPoint' does not exist or is not a valid volume"
-        exit 1
+    # Immediatly call drive dependency check ^
+    Test-DriveDependencies
+    
+    # Handle ApplyToAllFixedDisk, otherwise parse MountPoint
+    if ($ApplyToAllFixedDisk) {
+        Write-Host "[INFO] ApplyToAllFixedDisk is set; retrieving all fixed disks"
+        $drives = Get-Volume | Where-Object { $_.DriveType -eq 'Fixed' -and $_.DriveLetter } | 
+            Select-Object -ExpandProperty DriveLetter | ForEach-Object { $_ + ':' }
+        if (-not $drives) {
+            Write-Host "[ERROR] No fixed disks found on this system"
+            exit 1
+        }
+        Write-Host "[INFO] Found fixed disks: $($drives -join ', ')"
+    }
+    else {
+        # Parse MountPoint for multiple drives
+        $mountPoints = $MountPoint -split ',' | ForEach-Object { $_.Trim() }
+        $drives = @()
+        foreach ($mp in $mountPoints) {
+            # Regex to match single letter (e.g., 'C') or letter with colon and optional backslash (e.g., 'C:' or 'C:\')
+            if ($mp -match '^[A-Za-z]$' -or $mp -match '^[A-Za-z]:\\?$') {
+                # If single letter, append colon; otherwise normalize by replacing trailing backslash with colon
+                if ($mp -match '^[A-Za-z]$') {
+                    $mp = $mp + ':'
+                }
+                else {
+                    $mp = $mp -replace '\\$', ':'
+                }
+                # Fixed Disk saftey check
+                if (Test-Path $mp -PathType Container) {
+                    $driveInfo = Get-Volume -DriveLetter $mp[0] -ErrorAction SilentlyContinue
+                    if ($driveInfo -and $driveInfo.DriveType -eq 'Fixed') {
+                        $drives += $mp
+                    }
+                    else {
+                        Write-Host "[WARNING] MountPoint '$mp' is not a fixed disk; skipping"
+                    }
+                }
+                else {
+                    Write-Host "[WARNING] MountPoint '$mp' does not exist or is not a valid volume"
+                }
+            }
+            else {
+                # Updated message to reflect that both 'C' and 'C:' are accepted
+                Write-Host "[WARNING] Invalid MountPoint format: '$mp'. Must be a drive letter like 'C' or 'C:'"
+            }
+        }
+        if (-not $drives) {
+            Write-Host "[ERROR] No valid fixed disks specified in MountPoint"
+            exit 1
+        }
     }
     
     # Validate SuspensionRebootCount
@@ -127,17 +210,24 @@ begin {
         Write-Host "[WARNING] RebootDelay must be between 0 and 31536000 seconds; setting to 500"
         $RebootDelay = 500
     }
-
+    
     # Ensure AutoReboot aligns with Enable or Suspend
-    if ($AutoReboot -and $BitLockerProtection -notin @("Enable", "Suspend")) {
+    if ($AutoReboot -and $BitLockerProtection -notin @("Enable")) {
         Write-Host "[WARNING] AutoReboot is true but incompatible with '$BitLockerProtection'; setting to false"
         $AutoReboot = $false
     }
     
-    Write-Host "[SUCCESS] Dropdown values loaded:"
-    Write-Host "  - Bitlocker Mount Point: $MountPoint"
+    
+    Write-Host "[SUCCESS] Values loaded:"
+    # Dynamic MountPoint message
+    if ($ApplyToAllFixedDisk) {
+        Write-Host "  - Bitlocker Mount Point(s): Ignored (ApplyToAllFixedDisk is true)"
+    }
+    else {
+        Write-Host "  - Bitlocker Mount Point(s): $($MountPoint -join ', ')"
+    }
     Write-Host "  - Protection: $BitLockerProtection"
-    Write-Host "  - Recovery Key: $RecoveryKeyAction"
+    Write-Host "  - Recovery Key Action: $RecoveryKeyAction"
     Write-Host "  - Encryption Method: $BitlockerEncryptionMethod"
     Write-Host "  - Use TPM: $UseTpmProtector"
     Write-Host "  - Backup to AD: $BackupToAD"
@@ -151,15 +241,15 @@ begin {
         Write-Host "[INFO] PreventKeyPromptOnEveryBoot is ON; checking TPM and Recovery Key requirements"
         if ($BitLockerProtection -in @("Enable", "Suspend")) {
             Write-Host "[INFO] Protection action '$BitLockerProtection' selected; validating protector requirements"
-            # Sublogic: if TPM is disabled and Bitlocker is Enabled/Suspeneded, handle based on PreventKeyPromptOnEveryBoot bool
+            # Sublogic: if TPM is disabled and BitLocker is Enabled/Suspended, handle based on PreventKeyPromptOnEveryBoot bool
             if (-not $UseTpmProtector) {
                 Write-Host "[WARNING] TPM protector enforcement: UseTpmProtector was false, but PreventKeyPromptOnEveryBoot requires TPM for '$BitLockerProtection'. Setting UseTpmProtector to true."
                 $UseTpmProtector = $true
             }
             else {
-                Write-Host "[SUCCESS] TPM protector enforcement: UseTpmProtector is true, meeting PreventKeyPromptOnEveryBoot requirement"
+                Write-Host "[INFO] TPM protector enforcement: UseTpmProtector is true, meeting PreventKeyPromptOnEveryBoot requirement"
             }
-            # Sublogic: If recovery key was set to remove and Bitlocker is Enabled/Suspeneded, set to Ensure. There will ALWAYS be a Bitlocker recovery key when enabled/suspened
+            # Sublogic: If recovery key was set to remove and BitLocker is Enabled/Suspended, set to Ensure. There will ALWAYS be a BitLocker recovery key when enabled/suspended
             if ($RecoveryKeyAction -eq "Remove") {
                 Write-Host "[WARNING] Recovery Key enforcement: RecoveryKeyAction was 'Remove', but PreventKeyPromptOnEveryBoot requires a recovery key for '$BitLockerProtection'. Setting RecoveryKeyAction to 'Ensure'."
                 $RecoveryKeyAction = "Ensure"
@@ -174,10 +264,10 @@ begin {
     }
     # Sublogic: PreventKeyPromptOnEveryBoot handling when not enabled/true - proper sanitization and handling of states
     else {
-        Write-Host "[INFO] PreventKeyPromptOnEveryBoot is false; skipping strict TPM and Recovery Key enforcement checks.`nThis may result in Bitlocker prompting during EVERY BOOT if you remove the TPM."
+        Write-Host "[INFO] PreventKeyPromptOnEveryBoot is false; skipping strict TPM and Recovery Key enforcement checks.`nThis may result in BitLocker prompting during EVERY BOOT if you remove the TPM."
         if (-not $UseTpmProtector -and $BitLockerProtection -in @("Enable", "Suspend")) {
             Write-Host "[INFO] UseTpmProtector is false for '$BitLockerProtection'; checking Recovery Key requirement"
-            # Sublogic: Always ensure RecoveryKeyAction is ensured when Bitlocker is enabled/suspened, regardless of PreventKeyPromptOnEveryBoot state. This ensure recovery key management all of the time
+            # Sublogic: Always ensure RecoveryKeyAction is ensured when BitLocker is enabled/suspended, regardless of PreventKeyPromptOnEveryBoot state. This ensures recovery key management all of the time
             if ($RecoveryKeyAction -eq "Remove") {
                 Write-Host "[WARNING] RecoveryKeyAction was 'Remove', but a recovery key is required without TPM for '$BitLockerProtection'. Setting RecoveryKeyAction to 'Ensure'."
                 $RecoveryKeyAction = "Ensure"
@@ -188,7 +278,7 @@ begin {
         }
     }
     
-    # Bitlocker Protection Status sanitization
+    # BitLocker Protection Status sanitization
     if ($BitLockerProtection -eq "Disable") {
         Write-Host "[INFO] Protection action 'Disable' selected; validating possible conflicting settings"
         $BackupToAD = $false # disable AD backup
@@ -199,10 +289,10 @@ begin {
         else {
             Write-Host "[SUCCESS] RecoveryKeyAction is '$RecoveryKeyAction', compatible with 'Disable'"
         }
-        if ($BackupToAD)
-        {
+        if ($BackupToAD) {
             Write-Host "[WARNING] BackupToAD was '$BackupToAD', but 'Disable' only allows 'false'. Setting BackupToAD to 'false'."
-            $BackupToAD = $false # disable AD backup
+            # Disable AD backup
+            $BackupToAD = $false
         }
         else {
             Write-Host "[SUCCESS] BackupToAD is '$BackupToAD', compatible with 'Disable'"
@@ -211,6 +301,9 @@ begin {
     
     Write-Host "[SUCCESS] Input sanitization completed successfully"
 
+    # Initialize collection for recovery keys
+    $script:RecoveryKeys = @{}
+    
     #######################
     # Helper Functions
     #######################
@@ -228,20 +321,20 @@ begin {
         foreach ($Item in $Data.PSObject.Properties) {
             $ItemsHTML.add('<p ><b >' + $Item.Name + '</b><br />' + $Item.Value + '</p>')
         }
-        return Get-NinjaOneCard -Title $Title -Body ($ItemsHTML -join '') -Icon $Icon -TitleLink $TitleLink -BackgroundGradient $BackgroundGradient -BorderRadius $BorderRadius -IconColor $IconColor
+        return Get-NinjaOneCard -Title $Title -Body ($ItemsHTML -join '') -Icon $Icon -TitleLink $TitleLink -BackgroundGradient $BackgroundGradient -BorderRadius $BorderRadius -IconColor $IconColor -SeparationMargin -$CardSeparationMargin
     }
     
     # Helper function: Generate the HTML card with icon color support
-    function Get-NinjaOneCard($Title, $Body, [string]$Icon, [string]$TitleLink, [string]$Classes, [string]$BackgroundGradient, [string]$BorderRadius, [string]$IconColor) {
+    function Get-NinjaOneCard($Title, $Body, [string]$Icon, [string]$TitleLink, [string]$Classes, [string]$BackgroundGradient, [string]$BorderRadius, [string]$IconColor, [string]$SeparationMargin) {
         <#
         .SYNOPSIS
             Creates an HTML card for display in NinjaRMM with customizable background gradient, border radius, and icon color.
         
         .DESCRIPTION
-            Generates an HTML string representing a card with a title, body, optional icon with color, title link, additional classes, background gradient, and border radius.
+            Generates an HTML string representing a card with a title, body, optional icon with color, title link, additional classes, background gradient, border radius, and margin.
         #>
         [System.Collections.Generic.List[String]]$OutputHTML = @()
-        $style = "background: $BackgroundGradient; border-radius: $BorderRadius;"
+        $style = "background: $BackgroundGradient; border-radius: $BorderRadius; margin: $SeparationMargin;"
         $OutputHTML.add('<div class="card flex-grow-1' + $(if ($classes) { ' ' + $classes }) + '" style="' + $style + '">')
         if ($Title) {
             $iconHtml = if ($Icon) { '<i class="' + $Icon + '" style="color: ' + $IconColor + ';"></i> ' } else { '' }
@@ -271,11 +364,12 @@ begin {
             $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
             $logMessage = "[$timestamp] [$Level] $Message"
             
-            $driveLetter = ($MountPoint -replace '[^A-Za-z]', '').ToUpper()
-            $logDir = "$driveLetter`:\Logs"
-            $logFile = Join-Path $logDir "BitLockerScript.log"
+            # Use the system drive for logging
+            $systemDrive = (Get-CimInstance Win32_OperatingSystem).SystemDrive
+            $logDir = "$systemDrive\Logs\BitLocker"
+            $logFile = Join-Path $logDir "BitLockerManagement.log"
             
-            # Sublogic: Create the log directory if it doesn’t exist
+            # Sublogic: Create the log directory if it doesn't exist
             if (-not (Test-Path $logDir)) {
                 try { New-Item -ItemType Directory -Path $logDir -Force | Out-Null } catch {}
             }
@@ -291,11 +385,11 @@ begin {
             Add-Content -Path $logFile -Value $logMessage -ErrorAction SilentlyContinue
         }
     }
-    
-    # Helper function: refresh drive state
+
+    # Helper function: Refresh drive state
     function Get-VolumeObject {
         try {
-            # Sublogic: Retrieve Bitlocker volume object and suppress all non-error output
+            # Sublogic: Retrieve BitLocker volume object and suppress all non-error output
             $global:blv = Get-BitLockerVolume `
                 -MountPoint $MountPoint `
                 -ErrorAction Stop `
@@ -304,17 +398,34 @@ begin {
             # Only log volume state if not already logged for this mount point in this run
             if (-not $script:LastLogContext) { $script:LastLogContext = @{} }
             if (-not $script:LastLogContext.ContainsKey("VolumeState-$MountPoint")) {
-                Write-Log "SUCCESS" "Volume state refreshed: ProtectionStatus=$($blv.ProtectionStatus), VolumeStatus=$($blv.VolumeStatus)"
+                Write-Host "[SUCCESS] Volume state refreshed: ProtectionStatus=$($blv.ProtectionStatus), VolumeStatus=$($blv.VolumeStatus)"
                 $script:LastLogContext["VolumeState-$MountPoint"] = $true
             }
         }
         catch {
-            Write-Log "ERROR" "No Bitlocker volume at ${MountPoint}: $_"
+            Write-Log "ERROR" "No BitLocker volume at ${MountPoint}: $_"
             exit 1
         }
     }
     
-    # Helper function: detect if Bitlocker is awaiting key backup before activation. Usually occurs during first ever activation.
+    # Helper Function: Safe variable management 
+    function Clear-Memory {
+        [CmdletBinding()]
+        param(
+            [Parameter(Mandatory)]
+            [string[]]$VariableNames
+        )
+        foreach ($name in $VariableNames) {
+            # Null out the variable
+            Set-Variable -Name $name -Value $null -Scope Local -ErrorAction SilentlyContinue
+            # Remove it entirely
+            Clear-Variable -Name $name -Scope Local -ErrorAction SilentlyContinue
+        }
+        # No Write-Log output for safety
+        Write-Host "[INFO] Cleared memory for variables: $($VariableNames -join ', ')"
+    }
+    
+    # Helper function: Detect if BitLocker is awaiting key backup before activation. Usually occurs during first-ever activation.
     function Test-IsKeyBackupRequired {
         param($volume)
         # Sublogic: Suppress logging from nested recovery protector scans
@@ -326,7 +437,7 @@ begin {
         if ($volume.VolumeStatus -eq 'FullyEncrypted' -and $volume.ProtectionStatus -eq 0 -and $valid.Count -gt 0) {
             if (-not $script:LastLogContext) { $script:LastLogContext = @{} }
             if (-not $BackupToAD -and -not $script:LastLogContext.ContainsKey("KeyBackupRequired-$($volume.MountPoint)")) {
-                Write-Log "INFO" "Bitlocker is FullyEncrypted but Protection is Off. Consider checking recovery key is managed and or resuming protection."
+                Write-Log "INFO" "BitLocker is FullyEncrypted but Protection is Off. Consider checking recovery key is managed and/or resuming protection."
                 $script:LastLogContext["KeyBackupRequired-$($volume.MountPoint)"] = $true
             }
             return $true
@@ -334,7 +445,7 @@ begin {
         return $false
     }
     
-    # Helper function: return the list of valid protectors; list
+    # Helper function: Return the list of valid protectors; list
     function Get-ValidRecoveryProtectors {
         param($volume)
         # Only log the scan message if this is the top-level call, not if called internally by Test-RecoveryPasswordPresent etc
@@ -364,7 +475,8 @@ begin {
                     $script:LoggedRecoveryFound[$volume.MountPoint] = $true
                 }
                 $valid += $keypair
-            } else {
+            }
+            else {
                 Write-Log "WARNING" "Ignoring invalid protector ID: $($keypair.KeyProtectorId)"
             }
         }
@@ -374,7 +486,7 @@ begin {
         return $valid
     }
     
-    # Helper function: if there is an existing recovery password; bool
+    # Helper function: If there is an existing recovery password; bool
     function Test-RecoveryPasswordPresent {
         param($volume, [switch]$SuppressLog)
         # Sublogic: Suppress nested recovery protector scan logs
@@ -386,19 +498,19 @@ begin {
         if ($valid.Count -gt 0) {
             if (-not $SuppressLog -and -not $script:LastLogContext.ContainsKey("RecoveryPresent-$($volume.MountPoint)")) {
                 if ($volume.VolumeStatus -eq 'EncryptionInProgress' -or $volume.VolumeStatus -eq 'EncryptionPaused') {
-                    Write-Log "INFO" "Bitlocker is encrypting (status: $($volume.VolumeStatus))."
+                    Write-Log "INFO" "BitLocker is encrypting (status: $($volume.VolumeStatus))."
                 }
                 elseif ($volume.VolumeStatus -eq 'FullyEncrypted' -and $volume.ProtectionStatus -eq 0) {
-                    Write-Log "INFO" "Bitlocker is FullyEncrypted but Protection is Off. Consider checking recovery key is managed and or resuming protection."
+                    Write-Log "INFO" "BitLocker is FullyEncrypted but Protection is Off. Consider checking recovery key is managed and/or resuming protection."
                 }
                 elseif ($volume.ProtectionStatus -eq 'Off') {
                     if ($volume.VolumeStatus -eq 'DecryptionInProgress') {
-                        Write-Log "INFO" "Bitlocker is decrypting the volume. Please wait until decryption is complete before restarting."
+                        Write-Log "INFO" "BitLocker is decrypting the volume. Please wait until decryption is complete before restarting."
                     }
                     else {
                         $hasTpm = ($volume.KeyProtector | Where-Object { $_.KeyProtectorType -eq 'Tpm' }).Count -gt 0
                         if ($hasTpm) {
-                            Write-Log "INFO" "Bitlocker is Off with a TPM protector. Resume protection or reboot to finalize."
+                            Write-Log "INFO" "BitLocker is Off with a TPM protector. Resume protection or reboot to finalize."
                         }
                     }
                 }
@@ -415,7 +527,7 @@ begin {
         }
     }
     
-    # Helper function: ensure recovery key exists
+    # Helper function: Ensure recovery key exists
     function Ensure-RecoveryKey {
         param($volume)
         Write-Log "INFO" "Adding numeric recovery protector"
@@ -434,7 +546,7 @@ begin {
         }
     }
     
-    # Helper function: rotate recovery key
+    # Helper function: Rotate recovery key
     function Rotate-RecoveryKey {
         param($volume)
         Write-Log "INFO" "Rotating numeric recovery protector"
@@ -452,7 +564,7 @@ begin {
                       -KeyProtectorId $keypair.KeyProtectorId `
                       -ErrorAction Stop `
                       -InformationAction SilentlyContinue | Out-Null
-                    Write-Log "SUCCESS" "Removed protector $($keypair.KeyProtectorId)"
+                    Write-Log "INFO" "Removed protector $($keypair.KeyProtectorId)"
                 }
                 catch {
                     Write-Log "ERROR" "Failed to remove old protector $($keypair.KeyProtectorId): $_"
@@ -475,7 +587,7 @@ begin {
         }
     }
     
-    # Helper function: remove recovery key
+    # Helper function: Remove recovery key
     function Remove-RecoveryKey {
         param($volume)
         Write-Log "INFO" "Removing numeric recovery protector(s)"
@@ -513,7 +625,7 @@ begin {
         }
     }
     
-    # Helper function: remove all existing protectors
+    # Helper function: Remove all existing protectors
     function Remove-AllProtectors {
         param($volume)
         Write-Log "INFO" "Removing all existing key protectors"
@@ -538,7 +650,7 @@ begin {
         Write-Log "SUCCESS" "All protectors removed"
     }
     
-    # Helper function: manage the Bitlocker Recovery Key Action selection (See above 3 functions being called)
+    # Helper function: Manage the BitLocker Recovery Key Action selection
     function Invoke-RecoveryAction {
         param(
             [Parameter(Mandatory)]$volume,
@@ -571,7 +683,7 @@ begin {
                     Write-Log "WARNING" "Removal of recovery key is disabled when PreventKeyPromptOnEveryBoot is true; skipping"
                 }
                 elseif ($volume.ProtectionStatus -ne 'Off' -or $volume.VolumeStatus -ne 'FullyDecrypted') {
-                    if (-not $SuppressLog) { Write-Log "WARNING" "Cannot remove recovery key when Bitlocker is enabled or suspended; skipping" }
+                    if (-not $SuppressLog) { Write-Log "WARNING" "Cannot remove recovery key when BitLocker is enabled or suspended; skipping" }
                 }
                 elseif (-not $recoveryPresent) {
                     if (-not $SuppressLog) { Write-Log "WARNING" "No valid recovery key to Remove; skipping" }
@@ -583,18 +695,18 @@ begin {
         }
     }
     
-    # Helper function: save key to AD & AAD when if applicable
+    # Helper function: Save key to AD & AAD if applicable
     function Backup-KeyToAD {
         param($volume)
         Write-Log "INFO" "Determining backup location for recovery key"
-    
+        
         # Get BitLocker protectors
         $protectors = Get-ValidRecoveryProtectors -v $volume
         if (-not $protectors) {
             Write-Log "WARNING" "No numeric recovery protectors found; nothing to back up"
             return
         }
-    
+        
         # Check join status with dsregcmd.exe
         $DSRegOutput = [PSObject]::New()
         & dsregcmd.exe /status | Where-Object { $_ -match ' : ' } | ForEach-Object {
@@ -652,7 +764,7 @@ begin {
         return ($isOff -and $hasTpm)
     }
     
-    # Helper function: validate TPM exists 
+    # Helper function: Validate TPM exists 
     function Ensure-TpmProtector {
         param($volume)
         Write-Log "INFO" "Ensuring TPM protector exists"
@@ -663,7 +775,8 @@ begin {
                 Write-Log "WARNING" "TPM is not available or not ready; skipping TPM protector addition"
                 return
             }
-        } catch {
+        }
+        catch {
             Write-Log "WARNING" "Failed to check TPM status: $_; skipping TPM protector addition"
             return
         }
@@ -690,7 +803,7 @@ begin {
         }
     }
     
-    # Helper function: check if TPM is pending a restart or encryption already in progress
+    # Helper function: Check if TPM is pending a restart or encryption already in progress
     function Check-RestartRequirement {
         param($volume)
         # Sublogic: Check if volume is fully decrypted and protectors are present
@@ -698,10 +811,10 @@ begin {
             $hasTpm = ($volume.KeyProtector | Where-Object { $_.KeyProtectorType -eq 'Tpm' }).Count -gt 0
             $hasRecovery = ($volume.KeyProtector | Where-Object { $_.KeyProtectorType -eq 'RecoveryPassword' }).Count -gt 0
             if ($hasTpm -and $hasRecovery) {
-                Write-Log "INFO" "Bitlocker enabled with TPM and recovery key protectors. No restart required."
+                Write-Log "INFO" "BitLocker enabled with TPM and recovery key protectors. No restart required."
             }
             elseif ($hasTpm) {
-                Write-Log "WARNING" "Restart required to complete Bitlocker setup with TPM."
+                Write-Log "WARNING" "Restart required to complete BitLocker setup with TPM."
             }
         }
         elseif ($volume.ProtectionStatus -eq 'On' -and $volume.VolumeStatus -eq 'EncryptionInProgress') {
@@ -716,14 +829,14 @@ begin {
         # Sublogic: Check for pending reboots
         $rebootPending = Test-Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired"
         if ($rebootPending) {
-            Write-Log "WARNING" "A system reboot is pending, which may affect Bitlocker configuration. A reboot is recommended after changes have been made."
+            Write-Log "WARNING" "A system reboot is pending, which may affect BitLocker configuration. A reboot is recommended after changes have been made."
         }
         
         # Sublogic: Check TPM status
         try {
             $tpm = Get-Tpm
             if ($tpm.TpmPresent -and !$tpm.TpmReady) {
-                Write-Log "WARNING" "TPM is present but not ready. This may cause Bitlocker to enter recovery mode during the next boot."
+                Write-Log "WARNING" "TPM is present but not ready. This may cause BitLocker to enter recovery mode during the next boot."
             }
         }
         catch {
@@ -742,25 +855,19 @@ begin {
         # Sublogic: Check protector configuration
         $protectors = $volume.KeyProtector
         if ($protectors.Count -eq 0) {
-            Write-Log "WARNING" "No protectors configured for volume. Bitlocker will not function until protectors are added."
+            Write-Log "WARNING" "No protectors configured for volume. BitLocker will not function until protectors are added."
         }
     }
     
-    # Helper function: store recovery key, set secure feild to empty if bitlocker is already fully disabled 
+    # Helper function: Collect recovery key for later storage
     function Store-RecoveryKey {
         param($volume)
-        Write-Log "INFO" "Attempting to store current recovery key in secure field"
+        Write-Log "INFO" "Collecting recovery key for $($volume.MountPoint)"
         
         # Check if there are no protectors and the volume is fully disabled
         if (-not $volume.KeyProtector -and $volume.ProtectionStatus -eq 'Off' -and $volume.VolumeStatus -eq 'FullyDecrypted') {
-            Write-Log "INFO" "No protectors and volume is fully disabled; setting recovery key to 'N/A'"
-            try {
-                Ninja-Property-Set $RecoveryKeySecureFieldName "N/A" | Out-Null
-                Write-Log "SUCCESS" "Recovery key set to 'N/A' in secure field '$RecoveryKeySecureFieldName'"
-            }
-            catch {
-                Write-Log "ERROR" "Failed to set recovery key to 'N/A': $_"
-            }
+            Write-Log "INFO" "No protectors and volume is fully disabled; recording 'N/A' for $($volume.MountPoint)"
+            $script:RecoveryKeys[$volume.MountPoint] = "Drive: $($volume.MountPoint) - N/A"
             return
         }
         
@@ -775,6 +882,7 @@ begin {
             $protectors = Get-ValidRecoveryProtectors -v $volume
             if ($protectors) {
                 $latestProtector = $protectors | Sort-Object { $_.KeyProtectorId } | Select-Object -Last 1
+                # If there is a valid previous recovery key being roated, ensure only the new one is stored
                 if ($RecoveryKeyAction -eq 'Rotate' -and $script:PreviousRecoveryKey -and $latestProtector.KeyProtectorId -eq $script:PreviousRecoveryKey.KeyProtectorId) {
                     Write-Log "WARNING" "Detected old key ID $($latestProtector.KeyProtectorId) on attempt $($retryCount + 1); waiting for new key"
                 }
@@ -794,22 +902,21 @@ begin {
         # Store the latest key if available
         if ($protectors) {
             $latestProtector = $protectors | Sort-Object { $_.KeyProtectorId } | Select-Object -Last 1
-            $keyInfo = "ID: $($latestProtector.KeyProtectorId)`nKey: $($latestProtector.RecoveryPassword)"
-            Write-Log "INFO" "Attempting to store recovery key protector"
-            try {
-                Ninja-Property-Set $RecoveryKeySecureFieldName $keyInfo | Out-Null
-                Write-Log "SUCCESS" "Recovery key stored/updated in secure field '$RecoveryKeySecureFieldName'"
-            }
-            catch {
-                Write-Log "ERROR" "Failed to store recovery key: $_"
-            }
+            # Format the key information in a single-line string
+            $keyInfo = "$($volume.MountPoint) - Protector ID: $($latestProtector.KeyProtectorId) | Recovery Key: $($latestProtector.RecoveryPassword)"
+            Write-Log "INFO" "Collected recovery key for $($volume.MountPoint)"
+            # Overwrite the recovery keys collection (no appending)
+            $script:RecoveryKeys[$volume.MountPoint] = $keyInfo
+            # Clear sensitive param per call
+            Clear-Memory -VariableNames "keyInfo"
         }
         else {
-            Write-Log "WARNING" "No recovery key protectors found after $maxRetries retries; secure field not updated"
+            Write-Log "WARNING" "No recovery key protectors found after $maxRetries retries for $($volume.MountPoint); recording 'None'"
+            $script:RecoveryKeys[$volume.MountPoint] = "Drive: $($volume.MountPoint) - None"
         }
     }
     
-    # Helper function: parse the switch input for state management
+    # Helper function: Parse the switch input for state management
     function Get-DesiredProtectionState {
         param($action)
         switch ($action) {
@@ -825,316 +932,292 @@ begin {
 # PROCESS Block: Execute Bitlocker Actions
 # =========================================
 process {
+    Write-Log "INFO" "Starting BitLocker management for all specified drives"
     
-    # Proccess output for understanding
-    Write-Log "INFO" "Starting Bitlocker management and status card generation"
-    
-    # State management variables
+    # State management variables (reset for each run)
     $script:NumericProtectorCreated = $false
     $script:LastLogContext = @{}
     $script:LoggedRecoveryFound = @{}
+    $script:ProcessedVolumes = @()
     
-    Write-Host "`n=== Section: Volume Detection ==="
-    Write-Log "INFO" "Retrieving Bitlocker volume for $MountPoint"
-    
-    # Update the volume state
-    Get-VolumeObject
-    
-    # Track initial protection status from the Get-VolumeObject call
-    $script:initialProtectionStatus = $blv.ProtectionStatus
-    
-    Write-Host "`n=== Section: Protection State Check ==="
-    # Validate Bitlocker and TPM state
-    Validate-BitLockerState -v $blv
-    
-    # Evaluate TPM status and restart requirements
-    $isTpmPending = $false
-    if ($blv.ProtectionStatus -eq 'Off') {
-        $isTpmPending = Test-TpmPending -v $blv
-        if ($isTpmPending) {
-            $restartMessage = Check-RestartRequirement -v $blv
-            switch ($BitLockerProtection) {
-                'Enable' {
-                    Write-Log "INFO" "TPM is pending, but 'Enable' selected — continuing"
-                    if ($restartMessage) {
-                        Write-Log "INFO" $restartMessage
+    Write-Host "`n=== Drive Processing ==="
+    # Process each drive
+    foreach ($MountPoint in $drives) {
+        Write-Log "INFO" "Processing drive $MountPoint"
+        
+        # Reset per-drive state
+        $script:PreviousRecoveryKey = $null
+        $script:NumericProtectorCreated = $false
+        
+        # Update the volume state
+        Get-VolumeObject
+        $script:initialProtectionStatus = $blv.ProtectionStatus
+        
+        # Validate BitLocker and TPM state
+        Validate-BitLockerState -v $blv
+        
+        # Evaluate TPM status and restart requirements
+        $isTpmPending = $false
+        if ($blv.ProtectionStatus -eq 'Off') {
+            $isTpmPending = Test-TpmPending -v $blv
+            if ($isTpmPending) {
+                $restartMessage = Check-RestartRequirement -v $blv
+                switch ($BitLockerProtection) {
+                    'Enable' {
+                        Write-Log "INFO" "TPM is pending, but 'Enable' selected - continuing"
+                        if ($restartMessage) { Write-Log "INFO" $restartMessage }
+                    }
+                    'Suspend' {
+                        Write-Log "WARNING" "Cannot suspend - BitLocker is not yet enabled."
+                        if ($restartMessage) { Write-Log "INFO" $restartMessage }
+                        continue
+                    }
+                    default {
+                        Write-Log "WARNING" "TPM protector added but protection is Off; restart may be required."
+                        if ($restartMessage) { Write-Log "INFO" $restartMessage }
+                        continue
                     }
                 }
-                'Suspend' {
-                    Write-Log "WARNING" "Cannot suspend — Bitlocker is not yet enabled."
-                    if ($restartMessage) {
-                        Write-Log "INFO" $restartMessage
-                    }
-                    exit 0
-                }
-                default {
-                    Write-Log "WARNING" "TPM protector added but protection is Off; restart may be required."
-                    if ($restartMessage) {
-                        Write-Log "INFO" $restartMessage
-                    }
-                    exit 0
-                }
-            }
-        } else {
-            Write-Log "INFO" "Bitlocker is not enabled and no TPM protector is pending."
-        }
-    }
-    elseif ($blv.ProtectionStatus -eq 2) {
-        Write-Log "INFO" "Bitlocker is in a suspended state."
-    }
-    
-    Write-Host "`n=== Section: Protection (using: $BitLockerProtection) ==="
-
-    # TPM availability safety check
-    try {
-        $tpm = Get-Tpm
-        $tpmAvailable = $tpm.TpmPresent -and $tpm.TpmReady
-    }
-    catch {
-        $tpmAvailable = $false
-    }
-
-    if (-not $tpmAvailable -and $PreventKeyPromptOnEveryBoot) {
-        Write-Output "TPM is not available and PreventKeyPromptOnEveryBoot is true. Exiting script."
-        exit 1
-    }
-    elseif (-not $tpmAvailable) {
-        Write-Warning "TPM is not available, but PreventKeyPromptOnEveryBoot is false. Continuing without TPM."
-    }   
-    
-    # Manage the switch case logic for the Bitlocker ptotection selection
-    switch ($BitLockerProtection) {
-        'Enable' {
-            Write-Log "INFO" "Requested: Enable/Resume protection"
-            if ($blv.ProtectionStatus -eq 2) {
-                Write-Log "INFO" "Bitlocker is suspended; resuming protection"
-                if ($PreventKeyPromptOnEveryBoot) {
-                    Ensure-TpmProtector -v $blv
-                    # Respect user-specified RecoveryKeyAction (e.g., 'Rotate')
-                    Invoke-RecoveryAction -v $blv -Action $RecoveryKeyAction -SuppressLog
-                    Get-VolumeObject  # Refresh volume object after recovery action
-                }
-                try {
-                    Resume-Bitlocker -MountPoint $MountPoint -ErrorAction Stop | Out-Null
-                    Write-Log "SUCCESS" "Protection resumed"
-                    Get-VolumeObject
-                    $finalEnableState = "resumed"
-                }
-                catch {
-                    Write-Log "ERROR" "Failed to resume protection: $_"
-                    exit 1
-                }
-            }
-            elseif ($blv.ProtectionStatus -eq 'Off' -and $blv.VolumeStatus -eq 'FullyEncrypted') {
-                Write-Log "INFO" "Volume is FullyEncrypted but Protection is Off; adding protectors and resuming before recovery action"
-                if ($PreventKeyPromptOnEveryBoot) {
-                    Ensure-TpmProtector -v $blv
-                    # Resume protection first to ensure rotation can proceed
-                    try {
-                        Resume-Bitlocker -MountPoint $MountPoint -ErrorAction Stop | Out-Null
-                        Write-Log "SUCCESS" "Protection resumed before recovery action"
-                        Get-VolumeObject  # Refresh volume object after resuming protection
-                        # Set previous recovery key before rotation
-                        $script:PreviousRecoveryKey = (Get-ValidRecoveryProtectors -v $blv | Sort-Object { $_.KeyProtectorId } | Select-Object -Last 1)
-                        # Now perform the recovery key rotation
-                        Invoke-RecoveryAction -v $blv -Action $RecoveryKeyAction -SuppressLog
-                        Get-VolumeObject  # Refresh volume object after rotation
-                        $finalEnableState = "resumed"
-                    }
-                    catch {
-                        Write-Log "ERROR" "Failed to resume protection: $_"
-                        exit 1
-                    }
-                }
-                else {
-                    if ($UseTpmProtector) {
-                        Ensure-TpmProtector -v $blv
-                    }
-                    try {
-                        Resume-Bitlocker -MountPoint $MountPoint -ErrorAction Stop | Out-Null
-                        Write-Log "SUCCESS" "Protection resumed"
-                        Get-VolumeObject
-                        Invoke-RecoveryAction -v $blv -Action 'Ensure' -SuppressLog
-                        $finalEnableState = "resumed"
-                    }
-                    catch {
-                        Write-Log "ERROR" "Failed to resume protection: $_"
-                        exit 1
-                    }
-                }
-            }
-            elseif ($blv.ProtectionStatus -eq 'Off') {
-                # Sublogic: Enable protection and apply protectors if off
-                Write-Log "INFO" "Volume is off; enabling with protectors"
-                if ($blv.VolumeStatus -eq 'DecryptionInProgress') {
-                    Write-Log "WARNING" "Volume is decrypting; skipping enablement for safety"
-                    exit 0
-                }
-                if ($blv.VolumeStatus -eq 'FullyDecrypted') {
-                    Remove-AllProtectors -v $blv
-                }
-                # Log the encryption approach
-                if ($UseUsedSpaceOnly) {
-                    Write-Log "INFO" "Enabling Bitlocker with -UsedSpaceOnly"
-                }
-                else {
-                    Write-Log "INFO" "Enabling Bitlocker without -UsedSpaceOnly (full disk encryption)"
-                }
-                
-                # Enable Bitlocker with RecoveryPasswordProtector
-                Write-Log "INFO" "Enabling Bitlocker with Recovery Password protector"
-                try {
-                    Enable-Bitlocker `
-                        -MountPoint $MountPoint `
-                        -EncryptionMethod $BitlockerEncryptionMethod `
-                        -RecoveryPasswordProtector `
-                        -SkipHardwareTest `
-                        -ErrorAction Stop `
-                        -WarningAction SilentlyContinue `
-                        -InformationAction SilentlyContinue `
-                        -UsedSpaceOnly:$UseUsedSpaceOnly | Out-Null
-                    Write-Log "SUCCESS" "Bitlocker enabled with recovery key protector"
-                    Get-VolumeObject
-                    
-                    # Write UsedSpaceOnly setting to registry
-                    $usedSpaceOnlyText = if ($UseUsedSpaceOnly) { 'Yes' } else { 'No' }
-                    if (-not (Test-Path $BitLockerStateManagementPath)) {
-                        New-Item -Path $BitLockerStateManagementPath -Force | Out-Null
-                    }
-                    Set-ItemProperty -Path $BitLockerStateManagementPath -Name $UsedSpaceOnlyStateValueName -Value $usedSpaceOnlyText -Type String -Force
-                    Write-Log "INFO" "Stored UsedSpaceOnly setting in registry: $usedSpaceOnlyText"
-                }
-                catch {
-                    Write-Log "ERROR" "Failed to enable Bitlocker: $_"
-                    exit 1
-                }
-            
-                # Add TPM protector if required
-                # Will always be true with PreventKeyPromptOnEveryBoot
-                if ($UseTpmProtector) {
-                    Write-Log "INFO" "Adding TPM protector post-enablement"
-                    Ensure-TpmProtector -v $blv
-                    Get-VolumeObject
-                }
-            
-                $finalEnableState = "enabled"
             }
             else {
-                # Protection already active; reconcile protectors and handle recovery key action
-                Write-Log "INFO" "Protection already active; reconciling protectors"
-                if ($PreventKeyPromptOnEveryBoot) {
-                    Ensure-TpmProtector -v $blv
-                    # Always ensure a recovery key, but allow rotation if requested
-                    Invoke-RecoveryAction -v $blv -Action $RecoveryKeyAction -SuppressLog
-                }
-                else {
-                    Invoke-RecoveryAction -v $blv -Action $RecoveryKeyAction -SuppressLog
-                    if ($UseTpmProtector) {
+                Write-Log "INFO" "BitLocker is not enabled and no TPM protector is pending."
+            }
+        }
+        elseif ($blv.ProtectionStatus -eq 'Suspended') {
+            Write-Log "INFO" "BitLocker is in a suspended state."
+        }
+        
+        # TPM availability safety check
+        try {
+            $tpm = Get-Tpm
+            $tpmAvailable = $tpm.TpmPresent -and $tpm.TpmReady
+        }
+        catch {
+            $tpmAvailable = $false
+        }
+        if (-not $tpmAvailable -and $PreventKeyPromptOnEveryBoot) {
+            Write-Log "ERROR" "TPM is not available and PreventKeyPromptOnEveryBoot is true for $MountPoint. Skipping."
+            continue
+        }
+        elseif (-not $tpmAvailable) {
+            Write-Log "WARNING" "TPM is not available for $MountPoint, but PreventKeyPromptOnEveryBoot is false. Continuing without TPM."
+        }
+        
+        # Manage BitLocker protection
+        switch ($BitLockerProtection) {
+            'Enable' {
+                Write-Log "INFO" "Requested: Enable/Resume protection for $MountPoint"
+                if ($blv.ProtectionStatus -eq 'Suspended') {
+                    Write-Log "INFO" "BitLocker is suspended; resuming protection"
+                    if ($PreventKeyPromptOnEveryBoot) {
                         Ensure-TpmProtector -v $blv
+                        Invoke-RecoveryAction -v $blv -Action $RecoveryKeyAction -SuppressLog
+                        Get-VolumeObject
                     }
-                }
-                Get-VolumeObject
-                if ($blv.ProtectionStatus -eq 'Off' -and $blv.VolumeStatus -eq 'FullyEncrypted') {
-                    Write-Log "INFO" "Protection is off after protector reconciliation; resuming protection"
                     try {
-                        Resume-Bitlocker -MountPoint $MountPoint -ErrorAction Stop | Out-Null
+                        Resume-BitLocker -MountPoint $MountPoint -ErrorAction Stop | Out-Null
                         Write-Log "SUCCESS" "Protection resumed"
                         Get-VolumeObject
+                        # Set state
+                        $finalEnableState = "resumed"
                     }
                     catch {
                         Write-Log "ERROR" "Failed to resume protection: $_"
-                        exit 1
+                        continue
                     }
                 }
-                $finalEnableState = "reconciled"
-            }
-            
-            if ($finalEnableState) {
-                switch ($finalEnableState) {
-                    'resumed' {
-                        Write-Log "INFO" "Bitlocker protection successfully resumed"
-                    }
-                    'enabled' {
-                        if ($blv.VolumeStatus -eq 'EncryptionInProgress' -or $blv.VolumeStatus -eq 'EncryptionPaused') {
-                            Write-Log "INFO" "Bitlocker is encrypting (status: $($blv.VolumeStatus))."
+                elseif ($blv.ProtectionStatus -eq 'Off' -and $blv.VolumeStatus -eq 'FullyEncrypted') {
+                    Write-Log "INFO" "Volume is FullyEncrypted but Protection is Off; adding protectors and resuming"
+                    if ($PreventKeyPromptOnEveryBoot) {
+                        Ensure-TpmProtector -v $blv
+                        try {
+                            Resume-BitLocker -MountPoint $MountPoint -ErrorAction Stop | Out-Null
+                            Write-Log "SUCCESS" "Protection resumed before recovery action"
+                            Get-VolumeObject
+                            $script:PreviousRecoveryKey = (Get-ValidRecoveryProtectors -v $blv | Sort-Object { $_.KeyProtectorId } | Select-Object -Last 1)
+                            Invoke-RecoveryAction -v $blv -Action $RecoveryKeyAction -SuppressLog
+                            Get-VolumeObject
+                            # Set state
+                            $finalEnableState = "resumed"
+                        }
+                        catch {
+                            Write-Log "ERROR" "Failed to resume protection: $_"
+                            continue
                         }
                     }
-                    'reconciled' {
-                        Write-Log "INFO" "Protectors reconciled; protection status: $($blv.ProtectionStatus)"
+                    else {
+                        if ($UseTpmProtector) { Ensure-TpmProtector -v $blv }
+                        try {
+                            Resume-BitLocker -MountPoint $MountPoint -ErrorAction Stop | Out-Null
+                            Write-Log "SUCCESS" "Protection resumed"
+                            Get-VolumeObject
+                            Invoke-RecoveryAction -v $blv -Action 'Ensure' -SuppressLog
+                            # Set state
+                            $finalEnableState = "resumed"
+                        }
+                        catch {
+                            Write-Log "ERROR" "Failed to resume protection: $_"
+                            continue
+                        }
                     }
                 }
-            }
-        }
-        'Suspend' {
-            Write-Log "INFO" "Requested: Suspend protection"
-            # Sublogic: Check if volume is encrypting
-            if ($blv.VolumeStatus -eq 'EncryptionInProgress') {
-                Write-Log "WARNING" "Cannot suspend — Bitlocker is currently encrypting the volume."
-            }
-            elseif ($blv.ProtectionStatus -eq 2) {
-                Write-Log "WARNING" "Already suspended; skipping"
-            }
-            else {
-                # Sublogic: Ensure protectors before suspending if required
-                if ($PreventKeyPromptOnEveryBoot) {
-                    Ensure-TpmProtector -v $blv
-                    Invoke-RecoveryAction -v $blv -Action 'Ensure' -SuppressLog
+                elseif ($blv.ProtectionStatus -eq 'Off') {
+                    Write-Log "INFO" "Volume is off; enabling with protectors"
+                    if ($blv.VolumeStatus -eq 'DecryptionInProgress') {
+                        Write-Log "WARNING" "Volume is decrypting; skipping enablement for safety"
+                        continue
+                    }
+                    if ($blv.VolumeStatus -eq 'FullyDecrypted') {
+                        Remove-AllProtectors -v $blv
+                    }
+                    if ($UseUsedSpaceOnly) {
+                        Write-Log "INFO" "Enabling BitLocker with -UsedSpaceOnly"
+                    }
+                    else {
+                        Write-Log "INFO" "Enabling BitLocker without -UsedSpaceOnly (full disk encryption)"
+                    }
+                    try {
+                        Enable-BitLocker `
+                            -MountPoint $MountPoint `
+                            -EncryptionMethod $BitlockerEncryptionMethod `
+                            -RecoveryPasswordProtector `
+                            -SkipHardwareTest `
+                            -ErrorAction Stop `
+                            -WarningAction SilentlyContinue `
+                            -InformationAction SilentlyContinue `
+                            -UsedSpaceOnly:$UseUsedSpaceOnly | Out-Null
+                        Write-Log "SUCCESS" "BitLocker enabled with recovery key protector"
+                        Get-VolumeObject
+                        # Set state
+                        $usedSpaceOnlyText = if ($UseUsedSpaceOnly) { 'Yes' } else { 'No' }
+                        if (-not (Test-Path $BitLockerStateStoragePath)) {
+                            New-Item -Path $BitLockerStateStoragePath -Force | Out-Null
+                        }
+                        Set-ItemProperty -Path $BitLockerStateStoragePath -Name "$UsedSpaceOnlyStateValueName $MountPoint" -Value $usedSpaceOnlyText -Type String -Force
+                        Write-Log "INFO" "Stored UsedSpaceOnly setting in registry: $usedSpaceOnlyText"
+                    }
+                    catch {
+                        Write-Log "ERROR" "Failed to enable BitLocker: $_"
+                        continue
+                    }
+                    if ($UseTpmProtector) {
+                        Write-Log "INFO" "Adding TPM protector post-enablement"
+                        Ensure-TpmProtector -v $blv
+                        Get-VolumeObject
+                    }
+                    # Set state
+                    $finalEnableState = "enabled"
                 }
                 else {
-                    if ($UseTpmProtector) {
+                    Write-Log "INFO" "Protection already active; reconciling protectors"
+                    if ($PreventKeyPromptOnEveryBoot) {
                         Ensure-TpmProtector -v $blv
+                        Invoke-RecoveryAction -v $blv -Action $RecoveryKeyAction -SuppressLog
                     }
-                    Invoke-RecoveryAction -v $blv -Action 'Ensure' -SuppressLog
-                }
-                Get-VolumeObject
-                try {
-                    Suspend-Bitlocker -MountPoint $MountPoint -RebootCount $SuspensionRebootCount -ErrorAction Stop -InformationAction SilentlyContinue | Out-Null
-                    Write-Log "SUCCESS" "Protection suspended for $SuspensionRebootCount reboot(s)"
+                    else {
+                        Invoke-RecoveryAction -v $blv -Action $RecoveryKeyAction -SuppressLog
+                        if ($UseTpmProtector) { Ensure-TpmProtector -v $blv }
+                    }
                     Get-VolumeObject
+                    if ($blv.ProtectionStatus -eq 'Off' -and $blv.VolumeStatus -eq 'FullyEncrypted') {
+                        try {
+                            Resume-BitLocker -MountPoint $MountPoint -ErrorAction Stop | Out-Null
+                            Write-Log "SUCCESS" "Protection resumed"
+                            Get-VolumeObject
+                        }
+                        catch {
+                            Write-Log "ERROR" "Failed to resume protection: $_"
+                            continue
+                        }
+                    }
+                    $finalEnableState = "reconciled"
                 }
-                catch {
-                    Write-Log "ERROR" "Failed to suspend protection: $_"
-                    exit 1
+                if ($finalEnableState) {
+                    switch ($finalEnableState) {
+                        'resumed' { Write-Log "INFO" "BitLocker protection successfully resumed" }
+                        'enabled' {
+                            if ($blv.VolumeStatus -eq 'EncryptionInProgress' -or $blv.VolumeStatus -eq 'EncryptionPaused') {
+                                Write-Log "INFO" "BitLocker is encrypting (status: $($blv.VolumeStatus))."
+                            }
+                        }
+                        'reconciled' { Write-Log "INFO" "Protectors reconciled; protection status: $($blv.ProtectionStatus)" }
+                    }
                 }
+            }
+            'Suspend' {
+                Write-Log "INFO" "Requested: Suspend protection for $MountPoint"
+                if ($blv.VolumeStatus -eq 'EncryptionInProgress') {
+                    Write-Log "WARNING" "Cannot suspend - BitLocker is currently encrypting the volume."
+                }
+                elseif ($blv.ProtectionStatus -eq 'Suspended') {
+                    Write-Log "WARNING" "Already suspended; skipping"
+                }
+                else {
+                    if ($PreventKeyPromptOnEveryBoot) {
+                        Ensure-TpmProtector -v $blv
+                        Invoke-RecoveryAction -v $blv -Action 'Ensure' -SuppressLog
+                    }
+                    else {
+                        if ($UseTpmProtector) { Ensure-TpmProtector -v $blv }
+                        Invoke-RecoveryAction -v $blv -Action 'Ensure' -SuppressLog
+                    }
+                    Get-VolumeObject
+                    try {
+                        Suspend-BitLocker -MountPoint $MountPoint -RebootCount $SuspensionRebootCount -ErrorAction Stop -InformationAction SilentlyContinue | Out-Null
+                        Write-Log "SUCCESS" "Protection suspended for $SuspensionRebootCount reboot(s)"
+                        Get-VolumeObject
+                    }
+                    catch {
+                        Write-Log "ERROR" "Failed to suspend protection: $_"
+                        continue
+                    }
+                }
+            }
+            'Disable' {
+                Write-Log "INFO" "Requested: Disable protection for $MountPoint"
+                if ($blv.ProtectionStatus -eq 'Off' -and $blv.VolumeStatus -eq 'FullyDecrypted') {
+                    Write-Log "WARNING" "Already disabled; skipping"
+                }
+                else {
+                    try {
+                        Disable-BitLocker -MountPoint $MountPoint -ErrorAction Stop -InformationAction SilentlyContinue | Out-Null
+                        Write-Log "SUCCESS" "Decryption initiated"
+                        Get-VolumeObject
+                    }
+                    catch {
+                        Write-Log "ERROR" "Failed to disable protection: $_"
+                        continue
+                    }
+                }
+                if (-not (Test-Path $BitLockerStateStoragePath)) {
+                    New-Item -Path $BitLockerStateStoragePath -Force | Out-Null
+                }
+                Set-ItemProperty -Path $BitLockerStateStoragePath -Name "$UsedSpaceOnlyStateValueName $MountPoint"  -Value "N/A" -Type String -Force
+                Write-Log "INFO" "Set UsedSpaceOnly registry to 'N/A'"
             }
         }
-        'Disable' {
-            Write-Log "INFO" "Requested: Disable protection"
-            # Sublogic: Disable protection if not already off
-            if ($blv.ProtectionStatus -eq 'Off' -and $blv.VolumeStatus -eq 'FullyDecrypted') {
-                Write-Log "WARNING" "Already disabled; skipping"
-            }
-            else {
-                try {
-                    Disable-Bitlocker -MountPoint $MountPoint -ErrorAction Stop -InformationAction SilentlyContinue | Out-Null
-                    Write-Log "SUCCESS" "Decryption initiated"
-                    Get-VolumeObject
-                }
-                catch {
-                    Write-Log "ERROR" "Failed to disable protection: $_"
-                    exit 1
-                }
-            }
-            # Set registry to "Disabled" to reflect the disabled state
-            if (-not (Test-Path $BitLockerStateManagementPath)) {
-                New-Item -Path $BitLockerStateManagementPath -Force | Out-Null
-            }
-            Set-ItemProperty -Path $BitLockerStateManagementPath -Name $UsedSpaceOnlyStateValueName -Value "N/A" -Type String -Force
-            Write-Log "INFO" "Set UsedSpaceOnly registry to 'N/A'"
+        
+        # Apply recovery key action if not part of Enable process
+        if ($BitLockerProtection -ne 'Enable') {
+            Invoke-RecoveryAction -v $blv -Action $RecoveryKeyAction
+            Get-VolumeObject
         }
-    }
-    
-    Write-Host "`n=== Section: Recovery Key ==="
-    # Apply recovery key action if not part of Enable process
-    if ($BitLockerProtection -ne 'Enable') {
-        Invoke-RecoveryAction -v $blv -Action $RecoveryKeyAction
-        Get-VolumeObject  # Refresh volume state after recovery action
-    }
-    
-    # Backup to AD if set
-    if ($BackupToAD) {
-        Write-Host "`n=== Section: AD Backup ==="
-        Backup-KeyToAD -v $blv
+        
+        # Backup to AD if set
+        if ($BackupToAD) {
+            Write-Host "`n=== AD/Intune Key Backup ==="
+            Write-Log "INFO" "Backing up key for $MountPoint"
+            Backup-KeyToAD -v $blv
+        }
+        
+        # Collect recovery key (add to json per volume for future storage)
+        Store-RecoveryKey -v $blv
+
+        # Seperate each volume in output
+        Write-Host ""
+        
+        # Store volume object for END block
+        $script:ProcessedVolumes += ,$blv
     }
 }
 
@@ -1142,168 +1225,121 @@ process {
 # END Block: Generate Card & Finalization
 # =========================================
 end {
-    Write-Host "`n=== Section: Generate Status Card ==="
-    Get-VolumeObject  # Refresh volume object to reflect final state
+    # Will always have a line space from above
+    Write-Host "=== BitLocker Card Generation ==="
+    Write-Log "INFO" "Generating status card for all processed drives"
     
-    # Determine title icon and color based on Bitlocker state
-    switch ($blv.ProtectionStatus) {
-        'On' {
-            switch ($blv.VolumeStatus) {
-                'FullyEncrypted' {
-                    # Shield for fully protected
-                    $CardIcon = "fas fa-shield-alt"
-                    $CardIconColor = "#26A644"  # Green
-                }
-                'EncryptionInProgress' {
-                    # Shield for encrypting
-                    $CardIcon = "fas fa-shield-alt"
-                    $CardIconColor = "#F0AD4E"  # Yellow
-                }
-                default {
-                    # Shield for other 'On' states
-                    $CardIcon = "fas fa-shield-alt"
-                    $CardIconColor = "#F0AD4E"  # Yellow
+    # Initialize combined HTML for all cards
+    $allCardsHtml = ""
+    if (-not $script:ProcessedVolumes) { $script:ProcessedVolumes = @() }
+    
+    foreach ($volume in $script:ProcessedVolumes) {
+        $MountPoint = $volume.MountPoint
+        Get-VolumeObject  # Refresh volume object
+        
+        # Determine title icon and color
+        switch ($blv.ProtectionStatus) {
+            'On' {
+                switch ($blv.VolumeStatus) {
+                    'FullyEncrypted' { $CardIcon = "fas fa-shield-alt"; $CardIconColor = "#26A644" }
+                    'EncryptionInProgress' { $CardIcon = "fas fa-shield-alt"; $CardIconColor = "#F0AD4E" }
+                    default { $CardIcon = "fas fa-shield-alt"; $CardIconColor = "#F0AD4E" }
                 }
             }
-        }
-        'Suspended' {
-            # Shield for suspended
-            $CardIcon = "fas fa-shield-alt"
-            $CardIconColor = "#F0AD4E"  # Yellow
-        }
-        'Off' {
-            switch ($blv.VolumeStatus) {
-                'DecryptionInProgress' {
-                    # Shield for decrypting
-                    $CardIcon = "fas fa-shield-alt"
-                    $CardIconColor = "#D9534F"  # Red
-                }
-                'FullyDecrypted' {
-                    # Shield for fully decrypted
-                    $CardIcon = "fas fa-shield-alt"
-                    $CardIconColor = "#D9534F"  # Red
-                }
-                default {
-                    # Shield for other 'Off' states
-                    $CardIcon = "fas fa-shield-alt"
-                    $CardIconColor = "#F0AD4E"  # Yellow
+            'Suspended' { $CardIcon = "fas fa-shield-alt"; $CardIconColor = "#F0AD4E" }
+            'Off' {
+                switch ($blv.VolumeStatus) {
+                    'DecryptionInProgress' { $CardIcon = "fas fa-shield-alt"; $CardIconColor = "#D9534F" }
+                    'FullyDecrypted' { $CardIcon = "fas fa-shield-alt"; $CardIconColor = "#D9534F" }
+                    default { $CardIcon = "fas fa-shield-alt"; $CardIconColor = "#F0AD4E" }
                 }
             }
+            default { $CardIcon = "fas fa-shield-alt"; $CardIconColor = "#F0AD4E" }
         }
-        default {
-            # Shield for unknown states
-            $CardIcon = "fas fa-shield-alt"
-            $CardIconColor = "#F0AD4E"  # Yellow
+        
+        # Generate protection and volume status HTML
+        $protectionStatusHtml = switch ($blv.ProtectionStatus) {
+            'On' { '<i class="fas fa-check-circle" style="color:#26A644;"></i> On' }
+            'Off' { '<i class="fas fa-times-circle" style="color:#D9534F;"></i> Off' }
+            'Suspended' { '<i class="fas fa-pause-circle" style="color:#F0AD4E;"></i> Suspended' }
+            default { $blv.ProtectionStatus }
         }
-    }
-
-    # Generate protection status with icon
-    $protectionStatusHtml = switch ($blv.ProtectionStatus) {
-        'On' { 
-            # Green check circle for active protection
-            '<i class="fas fa-check-circle" style="color:#26A644;"></i> On' 
+        $volumeStatusHtml = switch ($blv.VolumeStatus) {
+            'FullyEncrypted' { '<i class="fas fa-lock" style="color:#26A644;"></i> Fully Encrypted' }
+            'EncryptionInProgress' { '<i class="fas fa-spinner" style="color:#F0AD4E;"></i> Encryption in Progress' }
+            'FullyDecrypted' { '<i class="fas fa-unlock" style="color:#D9534F;"></i> Fully Decrypted' }
+            'DecryptionInProgress' { '<i class="fas fa-spinner" style="color:#F0AD4E;"></i> Decryption in Progress' }
+            default { $blv.VolumeStatus }
         }
-        'Off' { 
-            # Red times circle for no protection
-            '<i class="fas fa-times-circle" style="color:#D9534F;"></i> Off' 
+        
+        $encryptionMethod = if ($blv.EncryptionMethod) { $blv.EncryptionMethod } else { 'N/A' }
+        $protectors = if ($blv.KeyProtector) { ($blv.KeyProtector | ForEach-Object { $_.KeyProtectorType }) -join ", " } else { 'None' }
+        
+        # Determine UsedSpaceOnly display value
+        if ($blv.ProtectionStatus -eq 'Off' -and $blv.VolumeStatus -eq 'FullyDecrypted') {
+            $usedSpaceOnlyDisplay = "N/A"
         }
-        'Suspended' { 
-            # Yellow pause circle for suspended protection
-            '<i class="fas fa-pause-circle" style="color:#F0AD4E;"></i> Suspended' 
-        }
-        default { 
-            # Plain text for unknown protection status
-            $blv.ProtectionStatus 
-        }
-    }
-
-    # Generate volume status with icon
-    $volumeStatusHtml = switch ($blv.VolumeStatus) {
-        'FullyEncrypted' { 
-            # Green lock for fully encrypted volume
-            '<i class="fas fa-lock" style="color:#26A644;"></i> Fully Encrypted' 
-        }
-        'EncryptionInProgress' { 
-            # Yellow spinner for encryption in progress
-            '<i class="fas fa-spinner" style="color:#F0AD4E;"></i> Encryption in Progress' 
-        }
-        'FullyDecrypted' { 
-            # Red unlock for fully decrypted volume
-            '<i class="fas fa-unlock" style="color:#D9534F;"></i> Fully Decrypted' 
-        }
-        'DecryptionInProgress' { 
-            # Yellow spinner for decryption in progress
-            '<i class="fas fa-spinner" style="color:#F0AD4E;"></i> Decryption in Progress' 
-        }
-        default { 
-            # Plain text for unknown volume status
-            $blv.VolumeStatus 
-        }
-    }
-    
-    # Get encryption method or 'N/A'
-    $encryptionMethod = if ($blv.EncryptionMethod) { $blv.EncryptionMethod } else { 'N/A' }
-    
-    # Get protectors or 'None'
-    $protectors = if ($blv.KeyProtector) { ($blv.KeyProtector | ForEach-Object { $_.KeyProtectorType }) -join ", " } else { 'None' }
-    
-    # Determine UsedSpaceOnly display value
-    if ($blv.ProtectionStatus -eq 'Off' -and $blv.VolumeStatus -eq 'FullyDecrypted') {
-        $usedSpaceOnlyDisplay = "N/A"
-    }
-    else {
-        try {
-            # Read the value
-            $value = Get-ItemPropertyValue -Path $BitLockerStateManagementPath -Name $UsedSpaceOnlyStateValueName -ErrorAction Stop
-            Write-Log "DEBUG" "Successfully read ${UsedSpaceOnlyStateValueName}: '$value'"
-            if ($value -in @("Yes", "No")) {
-                $usedSpaceOnlyDisplay = $value
+        else {
+            try {
+                $value = Get-ItemPropertyValue -Path $BitLockerStateStoragePath -Name "$UsedSpaceOnlyStateValueName $MountPoint" -ErrorAction Stop
+                $usedSpaceOnlyDisplay = if ($value -in @("Yes", "No")) { $value } else { "Unknown" }
             }
-            else {
+            catch {
                 $usedSpaceOnlyDisplay = "Unknown"
-                Write-Log "WARNING" "Invalid value for ${UsedSpaceOnlyStateValueName}: '$value'. Expected 'Yes' or 'No'."
             }
         }
-        catch {
-            $usedSpaceOnlyDisplay = "Unknown"
-            Write-Log "DEBUG" "Failed to read registry: $_"
+        
+        $bitlockerInfo = [PSCustomObject]@{
+            'Protection Status'       = $protectionStatusHtml
+            'Volume Status'           = $volumeStatusHtml
+            'Volume'                  = $MountPoint
+            'Encryption Method'       = $encryptionMethod
+            'Protectors'              = $protectors
+            'Encrypt Used Space Only' = $usedSpaceOnlyDisplay
         }
-        # Log if we end up with Unknown
-        if ($usedSpaceOnlyDisplay -eq "Unknown") {
-            Write-Log "WARNING" "Encrypt Used Space Only is ${usedSpaceOnlyDisplay}.`n Used Space Only state will be stored and read when enabling Bitlocker from a disabled state with the Bitlocker Management automation."
-        }
+        
+        # Generate card for this drive (could also make each one dynamic)
+        $cardHtml = Get-NinjaOneInfoCard -Title "$CardTitle ($MountPoint)" -Data $bitlockerInfo -Icon $CardIcon -BackgroundGradient $CardBackgroundGradient -BorderRadius $CardBorderRadius -IconColor $CardIconColor -SeparationMargin $CardSeparationMargin
+        $allCardsHtml += $cardHtml
     }
     
-    # Create Bitlocker info object with UsedSpaceOnly always included
-    $bitlockerInfo = [PSCustomObject]@{
-        'Protection Status'       = $protectionStatusHtml
-        'Volume Status'           = $volumeStatusHtml
-        'Mount Point'             = $MountPoint
-        'Encryption Method'       = $encryptionMethod
-        'Protectors'              = $protectors
-        'Encrypt Used Space Only' = $usedSpaceOnlyDisplay
-    }
-    
-    # Generate HTML card with dynamic title, icon, and calculated icon color
-    $cardHtml = Get-NinjaOneInfoCard -Title $CardTitle -Data $bitlockerInfo -Icon $CardIcon -BackgroundGradient $CardBackgroundGradient -BorderRadius $CardBorderRadius -IconColor $CardIconColor
-    
-    # Store the card in the custom field
+    # Store all cards in the custom field
     try {
-        $cardHtml | Ninja-Property-Set-Piped -Name $BitLockerStatusFieldName
-        Write-Log "SUCCESS" "Bitlocker status card stored in '$BitLockerStatusFieldName'"
+        $allCardsHtml | Ninja-Property-Set-Piped -Name $BitLockerStatusFieldName
+        Write-Log "SUCCESS" "BitLocker status cards stored in '$BitLockerStatusFieldName'"
     }
     catch {
-        Write-Log "ERROR" "Failed to store status card: $_"
+        Write-Log "ERROR" "Failed to store status cards: $_"
     }
     
-    # Store the recovery key
-    Store-RecoveryKey -v $blv
-
-    # Schedule a reboot if AutoReboot is enabled and applicable
+    # Store all recovery keys in single-line format
+    Write-Log "INFO" "Storing all collected recovery keys in secure field"
+    try {
+        if ($script:RecoveryKeys.Count -eq 0) {
+            Write-Log "INFO" "No recovery keys collected; setting secure field to N/A"
+            Ninja-Property-Set $RecoveryKeySecureFieldName "N/A" | Out-Null
+        }
+        else {
+            $allKeys = ($script:RecoveryKeys.Values -join "; ")
+            Ninja-Property-Set $RecoveryKeySecureFieldName $allKeys | Out-Null
+            Write-Log "SUCCESS" "Stored recovery keys for drive(s) ($($script:RecoveryKeys.Keys -join ', ')) in '$RecoveryKeySecureFieldName'"
+            # Clear sensitive data
+            Clear-Memory -VariableNames "allKeys"
+        }
+    }
+    catch {
+        Write-Log "ERROR" "Failed to store recovery keys: $_"
+    }
+    
+    # Schedule reboot if applicable
     if ($AutoReboot) {
         Write-Log "INFO" "AutoReboot enabled; scheduling reboot in $RebootDelay seconds"
         Start-Process shutdown -ArgumentList "/r /t $RebootDelay" -NoNewWindow
     }
     
-    Write-Log "INFO" "Bitlocker management and status card generation completed"
+    # Clear sensitive state
+    Clear-Memory -VariableNames "RecoveryKeys"
+    
+    Write-Host "`n=== Complete ==="
+    Write-Log "SUCCESS" "BitLocker management completed"
 }
